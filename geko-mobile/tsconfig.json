@@ -2,7 +2,6 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "sourceMap": true,
-
     "strict": true,
     "baseUrl": "./",
     "allowSyntheticDefaultImports": true,
@@ -11,7 +10,7 @@
     "noUnusedParameters": true,
     "paths": {
       "@/*": ["*"],
-      "@ui/*": ["components/ui/*"],
+      "@ui/*": ["src/features/shared/components/ui/*"],
       "@gluestack-ui-provider": ["src/providers/gluestack-ui-provider"],
       "@hooks/*": ["src/hooks/*"],
       "@constants/*": ["src/constants/*"],
@@ -21,5 +20,11 @@
       "tailwind.config": ["tailwind.config.js"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ]
 }

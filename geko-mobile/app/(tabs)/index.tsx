@@ -1,3 +1,4 @@
+import { Input } from '@/components/ui/input';
 import { StyleSheet, View } from 'react-native';
 
 export default function HomeScreen() {

@@ -1,12 +1,24 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "sourceMap": true,
+
     "strict": true,
+    "baseUrl": "./",
+    "allowSyntheticDefaultImports": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "paths": {
-      "@/*": ["./*"],
-      "@ui/*": ["./components/ui/*"],
-      "@gluestack-ui-provider": ["./src/providers/gluestack-ui-provider"],
-      "tailwind.config": ["./tailwind.config.js"]
+      "@/*": ["*"],
+      "@ui/*": ["components/ui/*"],
+      "@gluestack-ui-provider": ["src/providers/gluestack-ui-provider"],
+      "@hooks/*": ["src/hooks/*"],
+      "@constants/*": ["src/constants/*"],
+      "@utils/*": ["src/utils/*"],
+      "@providers/*": ["src/providers/*"],
+      "@assets/*": ["src/assets/*"],
+      "tailwind.config": ["tailwind.config.js"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

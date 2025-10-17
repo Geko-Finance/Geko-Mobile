@@ -1,7 +1,7 @@
 import { Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useColorScheme } from "@hooks/use-color-scheme";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

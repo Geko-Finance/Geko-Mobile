@@ -43,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ce6acf82-0902-40c8-b1ef-542195c6d92e"
+      }
+    },
+    "owner": "geko-mobile"
   }
 }

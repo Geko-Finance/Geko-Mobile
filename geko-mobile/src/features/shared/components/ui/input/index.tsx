@@ -210,34 +210,71 @@ const InputField = React.forwardRef<
   );
 });
 
-// type InputProps = {
-//   variant?: 'outline' | 'underlined' | 'rounded' ;
-//   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-//   isDisabled?: boolean;
-//   isInvalid?: boolean;
-//   isReadOnly?: boolean;
-//   isRequired?: boolean;
-//   isPassword?: boolean;
-//   width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
-//   height?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
-//   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
-//   placeholder?: string;
-//   value?: string | number;
-  
-//   onChange?: (text: string) => void;
-// }
+type InputProps = {
+  variant?: "outline" | "underlined" | "rounded";
+  size?: "sm" | "md" | "lg" | "xl";
+  isDisabled?: boolean;
+  isInvalid?: boolean;
+  isReadOnly?: boolean;
+  isRequired?: boolean;
+  isPassword?: boolean;
+  placeholder?: string;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  autoComplete?: "off";
+  autoCorrect?: boolean;
+  value?: string | number;
+  classNameInputField?: string;
+  classNameInput?: string;
+  onChange?: (text: string) => void;
+};
 
-// const Input = ({ variant, size, ...props }: InputProps) => {
-//   return (
-//     <InputNative variant={variant} size={size} {...props}>
-//       <InputField />
-//     </InputNative>
-//   );
-// };
+const Input = ({
+  variant,
+  size,
+  isDisabled,
+  isInvalid,
+  isReadOnly,
+  isRequired,
+  isPassword,
+  placeholder,
+  autoCapitalize,
+  autoComplete,
+  autoCorrect,
+  value,
+  onChange,
+  classNameInputField,
+  classNameInput,
+  ...props
+}: InputProps) => {
+  return (
+    <InputNative
+      className={classNameInput}
+      variant={variant}
+      isDisabled={isDisabled}
+      isInvalid={isInvalid}
+      isReadOnly={isReadOnly}
+      isRequired={isRequired}
+      size={size}
+      {...props}
+    >
+      <InputField
+        className={classNameInputField}
+        type={isPassword ? "password" : "text"}
+        value={value != null ? String(value) : ""}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        autoCorrect={autoCorrect}
+      />
+    </InputNative>
+  );
+};
 
+Input.displayName = "Input";
 InputNative.displayName = "InputNative";
 InputIcon.displayName = "InputIcon";
 InputSlot.displayName = "InputSlot";
 InputField.displayName = "InputField";
 
-export { InputField, InputIcon, InputSlot };
+export { Input, InputField, InputIcon, InputSlot };

@@ -4,7 +4,7 @@
     "slug": "geko-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/iconApp.png",
+    "icon": "./src/assets/icons/iconApp.png",
     "scheme": "gekomobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,23 +18,24 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/icons/iconApp.png",
-        "backgroundImage": "./assets/icons/iconApp.png",
-        "monochromeImage": "./assets/icons/iconApp.png"
+        "foregroundImage": "./src/assets/icons/iconApp.png",
+        "backgroundImage": "./src/assets/icons/iconApp.png",
+        "monochromeImage": "./src/assets/icons/iconApp.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.gekomobile.gekomobile"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/icons/iconApp.png"
+      "favicon": "./src/assets/icons/iconApp.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash.png",
+          "image": "./src/assets/images/splash/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

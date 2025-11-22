@@ -10,7 +10,11 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/src/hooks/use-color-scheme";
 
 import "@/global.css";
+import { BottomNavTabProvider } from "@/src/features/shared/hooks/bottom-nav-tab/useBottomNavTab";
+import { GestureHandlerProvider } from "@/src/providers/gesture-handler-provider/GestureProvider";
+import { SafeAreaProvider } from "@/src/providers/safe-area-provider";
 import { GluestackUIProvider } from "@gluestack-ui-provider";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -20,17 +24,31 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <GluestackUIProvider mode="dark">
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", title: "Modal" }}
-          />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </GluestackUIProvider>
+    <SafeAreaProvider>
+      <GluestackUIProvider mode="dark">
+        <GestureHandlerProvider>
+          <BottomSheetModalProvider>
+            <BottomNavTabProvider>
+              <ThemeProvider
+                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+              >
+                <Stack>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="home/index"
+                    options={{ title: "", headerBackTitle: "" }}
+                  />
+                  <Stack.Screen
+                    name="modal"
+                    options={{ presentation: "modal", title: "Modal" }}
+                  />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </BottomNavTabProvider>
+          </BottomSheetModalProvider>
+        </GestureHandlerProvider>
+      </GluestackUIProvider>
+    </SafeAreaProvider>
   );
 }

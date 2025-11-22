@@ -10,7 +10,7 @@ import {
 import { cssInterop } from "nativewind";
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { useTranslation } from "../../../hooks/general/useTranslation";
+import { useTranslation } from "@shared/hooks/general/useTranslation";
 
 const SCOPE = "BUTTON";
 

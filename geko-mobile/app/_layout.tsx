@@ -7,12 +7,12 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
-import { useColorScheme } from "@/src/hooks/use-color-scheme";
+import { useColorScheme } from "@/src/features/shared/hooks/global/use-color-scheme";
 
 import "@/global.css";
 import { BottomNavTabProvider } from "@/src/features/shared/hooks/bottom-nav-tab/useBottomNavTab";
-import { GestureHandlerProvider } from "@/src/providers/gesture-handler-provider/GestureProvider";
-import { SafeAreaProvider } from "@/src/providers/safe-area-provider";
+import { GestureHandlerProvider } from "@/src/features/shared/providers/gesture-handler-provider/GestureProvider";
+import { SafeAreaProvider } from "@/src/features/shared/providers/safe-area-provider";
 import { GluestackUIProvider } from "@gluestack-ui-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
@@ -33,7 +33,10 @@ export default function RootLayout() {
                 value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
               >
                 <Stack>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
                   <Stack.Screen
                     name="home/index"
                     options={{ title: "", headerBackTitle: "" }}

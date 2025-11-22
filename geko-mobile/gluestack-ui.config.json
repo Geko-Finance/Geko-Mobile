@@ -1,6 +1,6 @@
 {
   "componentPath": "./components/ui",
-  "provider": "./src/providers/gluestack-ui-provider",
+  "provider": "./src/features/shared/providers/gluestack-ui-provider",
   "tailwind": {
     "config": "./tailwind.config.js",
     "content": "./global.css"

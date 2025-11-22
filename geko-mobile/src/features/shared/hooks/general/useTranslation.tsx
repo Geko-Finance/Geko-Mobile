@@ -1,4 +1,4 @@
-import i18n from "@utils/translations/i18n";
+import i18n from "@shared/utils/translations/i18n";
 import { TranslateOptions } from "i18n-js";
 import { useCallback } from "react";
 

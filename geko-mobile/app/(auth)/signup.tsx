@@ -2,6 +2,6 @@ import { ScreenContainer } from "@/src/features/shared/components/ui/screen-cont
 
 export default function SignUpScreen() {
   return (
-    <ScreenContainer>{/* Tu implementación de signup aquí */}</ScreenContainer>
+    <ScreenContainer></ScreenContainer>
   );
 }

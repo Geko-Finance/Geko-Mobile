@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "expo-go": "npx expo start --go --lan --clear",
-    "dev-ios-simulator-build": "npx eas-cli build --profile development --platform ios",
+    "dev-ios-simulator-build": "npx eas-cli build --profile ios-simulator --platform ios",
     "dev-android-simulator-build": "npx eas-cli build --profile development --platform android"
   },
   "dependencies": {

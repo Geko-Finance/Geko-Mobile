@@ -29,14 +29,14 @@ export function TransactionRow({
       </View>
 
       <View className="flex-1">
-        <Text className="text-[15px] font-semibold text-[#77777B]">{meta}</Text>
-        <Text className="mt-0.5 text-[19px] font-semibold text-[#D6D6DB]">
+        <Text className="text-[12px] font-semibold text-[#77777B]">{meta}</Text>
+        <Text className="mt-0.5 text-[15px] font-semibold text-[#D6D6DB]">
           {title}
         </Text>
       </View>
 
       <View className={`rounded-full px-4 py-2 ${amountToneClassName[amountTone]}`}>
-        <Text className="text-[16px] font-extrabold text-[#06101B]">
+        <Text className="text-[12px] font-extrabold text-[#06101B]">
           {amount}
         </Text>
       </View>

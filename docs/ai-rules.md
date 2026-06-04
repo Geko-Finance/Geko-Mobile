@@ -33,7 +33,7 @@ npm.cmd run doctor
 - Local client state: Zustand.
 - Sensitive persistence: SecureStore.
 - Navigation: Expo Router.
-- iOS native UI: `@expo/ui`, `*.ios.tsx`, or wrapped native components.
+- iOS native UI: `*.ios.tsx` or wrapped native components. Use `@expo/ui` only after EAS iOS compatibility is verified.
 - Android UI: Gluestack/NativeWind.
 
 ## Prompt Template

@@ -28,7 +28,7 @@ Act as a senior Expo/EAS fintech mobile engineer. Optimize for correctness, main
 ## UI Strategy
 
 - iOS first-class native feel:
-  - Prefer `@expo/ui` where it gives native iOS behavior.
+  - `@expo/ui` is planned, but do not install or use it until EAS iOS builds pass with the installed Expo SDK.
   - Use platform-specific files when needed: `Component.ios.tsx`.
   - For future custom native iOS experiences, isolate Swift/native code behind small React components.
 - Android:

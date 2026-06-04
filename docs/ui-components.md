@@ -5,7 +5,7 @@
 ### iOS
 
 - Prefer native-feeling components.
-- Use `@expo/ui` when it provides the right native primitive.
+- `@expo/ui` is planned, but currently gated by EAS iOS build compatibility.
 - Use `*.ios.tsx` for iOS-only behavior or appearance.
 - Future Swift/custom iOS components should be wrapped behind small React APIs.
 

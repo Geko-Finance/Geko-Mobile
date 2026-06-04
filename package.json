@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@expo/html-elements": "^0.12.5",
+    "@expo/ui": "~0.2.0-beta.9",
     "@expo/vector-icons": "^15.0.3",
     "@gluestack-ui/core": "^3.0.10",
     "@gluestack-ui/utils": "^3.0.11",

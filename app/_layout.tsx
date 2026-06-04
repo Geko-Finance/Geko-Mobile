@@ -44,7 +44,7 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="(app)" options={{ headerShown: false }} />
                 </Stack>
-                <StatusBar style="auto" />
+                <StatusBar style="light" />
               </AppProviders>
             </ThemeProvider>
           </BottomSheetModalProvider>

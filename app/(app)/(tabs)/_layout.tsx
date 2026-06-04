@@ -1,13 +1,20 @@
-import { Tabs } from "expo-router";
+import { Label, NativeTabs } from "expo-router/unstable-native-tabs";
 
 export default function AppTabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
-      <Tabs.Screen name="wallet" options={{ title: "Wallet" }} />
-      <Tabs.Screen name="payments" options={{ title: "Payments" }} />
-      <Tabs.Screen name="activity" options={{ title: "Activity" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-    </Tabs>
+    <NativeTabs>
+      <NativeTabs.Trigger name="home">
+        <Label>Home</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="finances">
+        <Label>Finances</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="ai">
+        <Label>AI</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="invest">
+        <Label>Invest</Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

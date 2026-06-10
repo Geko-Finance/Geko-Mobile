@@ -3,6 +3,7 @@
   "compilerOptions": {
     "sourceMap": true,
     "strict": true,
+    "ignoreDeprecations": "6.0",
     "baseUrl": "./",
     "allowSyntheticDefaultImports": true,
     "noImplicitReturns": true,

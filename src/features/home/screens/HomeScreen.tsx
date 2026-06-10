@@ -9,7 +9,7 @@ import {
   Send,
 } from "lucide-react-native";
 import { Animated, Image, StyleSheet, Text, View } from "react-native";
-import { useRef } from "react";
+import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -87,17 +87,32 @@ const TRANSACTIONS = [
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const stickyOpacity = scrollY.interpolate({
-    inputRange: [170, 260],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-  const stickyTranslateY = scrollY.interpolate({
-    inputRange: [170, 260],
-    outputRange: [-16, 0],
-    extrapolate: "clamp",
-  });
+  const scrollY = useMemo(() => new Animated.Value(0), []);
+  const stickyOpacity = useMemo(
+    () =>
+      scrollY.interpolate({
+        inputRange: [170, 260],
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+    [scrollY]
+  );
+  const stickyTranslateY = useMemo(
+    () =>
+      scrollY.interpolate({
+        inputRange: [170, 260],
+        outputRange: [-16, 0],
+        extrapolate: "clamp",
+      }),
+    [scrollY]
+  );
+  const handleScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollY]
+  );
 
   return (
     <View className="flex-1 bg-black">
@@ -133,10 +148,7 @@ export function HomeScreen() {
         className="flex-1"
         contentContainerClassName="px-5 pb-10"
         contentContainerStyle={{ paddingTop: insets.top + 16 }}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >

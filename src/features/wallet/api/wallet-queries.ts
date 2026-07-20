@@ -1,11 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
 import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
+import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
 import {
   getStellarClient,
   isAccountNotFoundError,
 } from "@/src/services/api/stellar/stellar-client";
+
+import { useWalletStore } from "../state/wallet-store";
 
 export { isAccountNotFoundError };
 
@@ -31,5 +34,25 @@ export function useAccountBalances(publicKey: string | undefined) {
     queryKey: walletKeys.balances(networkId, publicKey ?? "none"),
     retry: (failureCount, error) =>
       !isAccountNotFoundError(error) && failureCount < 1,
+  });
+}
+
+/**
+ * Dev/testnet-only flow — generates a keypair, discards the secret (watch-only),
+ * funds via Friendbot, and registers the account; fails with ApiError(400) on
+ * networks without Friendbot.
+ */
+export function useCreateTestWallet() {
+  return useMutation({
+    mutationFn: async (_input: { name: string }) => createFundedTestAccount(),
+    onSuccess: ({ publicKey }, input) => {
+      useWalletStore.getState().addAccount({
+        createdAt: new Date().toISOString(),
+        custody: "watch_only",
+        id: publicKey,
+        name: input.name.trim() || "Test Wallet",
+        publicKey,
+      });
+    },
   });
 }

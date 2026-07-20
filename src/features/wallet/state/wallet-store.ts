@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import { appConfig } from "@/src/config/env";
 import type { WalletAccount } from "@/src/domain/wallet";
+import { asyncStateStorage } from "@/src/services/storage/async-json-storage";
 
 import { DEV_SEED_ACCOUNTS } from "./wallet-seed";
 
@@ -35,57 +37,76 @@ const initialActiveAccountId =
     : null;
 
 /**
- * In-memory wallet account state for the foundation epic.
- * Persistence ships with the custody epics (SecureStore stays reserved for secrets per CLAUDE.md).
+ * Wallet account metadata state for the foundation epic.
+ * Persists account metadata (names, public keys, custody kind — never secrets) via AsyncStorage;
+ * dev seeds populate the initial state and are written on first launch; after that, rehydrated
+ * state wins, so removed seeds stay removed. Hydration is asynchronous — on later launches the
+ * seeds may flash briefly before rehydration replaces them, which is acceptable for the
+ * mock-first phase. SecureStore stays reserved for secrets per CLAUDE.md.
  */
-export const useWalletStore = create<WalletState>((set, get) => ({
-  accounts: initialAccounts,
-  activeAccountId: initialActiveAccountId,
-  setAccounts: (accounts) =>
-    set((state) => ({
-      accounts,
-      activeAccountId: resolveActiveAccountId(accounts, state.activeAccountId),
-    })),
-  addAccount: (account) =>
-    set((state) => {
-      const existingIndex = state.accounts.findIndex(
-        (entry) => entry.id === account.id
-      );
-      const accounts =
-        existingIndex >= 0
-          ? state.accounts.map((entry, index) =>
-              index === existingIndex ? account : entry
-            )
-          : [...state.accounts, account];
-      const activeAccountId =
-        state.activeAccountId === null ? account.id : state.activeAccountId;
+export const useWalletStore = create<WalletState>()(
+  persist(
+    (set, get) => ({
+      accounts: initialAccounts,
+      activeAccountId: initialActiveAccountId,
+      setAccounts: (accounts) =>
+        set((state) => ({
+          accounts,
+          activeAccountId: resolveActiveAccountId(accounts, state.activeAccountId),
+        })),
+      addAccount: (account) =>
+        set((state) => {
+          const existingIndex = state.accounts.findIndex(
+            (entry) => entry.id === account.id
+          );
+          const accounts =
+            existingIndex >= 0
+              ? state.accounts.map((entry, index) =>
+                  index === existingIndex ? account : entry
+                )
+              : [...state.accounts, account];
+          const activeAccountId =
+            state.activeAccountId === null ? account.id : state.activeAccountId;
 
-      return { accounts, activeAccountId };
-    }),
-  removeAccount: (accountId) =>
-    set((state) => {
-      const accounts = state.accounts.filter((account) => account.id !== accountId);
-      const activeAccountId =
-        state.activeAccountId === accountId
-          ? resolveActiveAccountId(accounts, null)
-          : state.activeAccountId;
+          return { accounts, activeAccountId };
+        }),
+      removeAccount: (accountId) =>
+        set((state) => {
+          const accounts = state.accounts.filter(
+            (account) => account.id !== accountId
+          );
+          const activeAccountId =
+            state.activeAccountId === accountId
+              ? resolveActiveAccountId(accounts, null)
+              : state.activeAccountId;
 
-      return { accounts, activeAccountId };
+          return { accounts, activeAccountId };
+        }),
+      setActiveAccount: (accountId) => {
+        if (!get().accounts.some((account) => account.id === accountId)) {
+          return;
+        }
+
+        set({ activeAccountId: accountId });
+      },
+      renameAccount: (accountId, name) =>
+        set((state) => ({
+          accounts: state.accounts.map((account) =>
+            account.id === accountId ? { ...account, name } : account
+          ),
+        })),
     }),
-  setActiveAccount: (accountId) => {
-    if (!get().accounts.some((account) => account.id === accountId)) {
-      return;
+    {
+      name: "geko.wallet.accounts.v1",
+      partialize: (state) => ({
+        accounts: state.accounts,
+        activeAccountId: state.activeAccountId,
+      }),
+      storage: createJSONStorage(() => asyncStateStorage),
+      version: 1,
     }
-
-    set({ activeAccountId: accountId });
-  },
-  renameAccount: (accountId, name) =>
-    set((state) => ({
-      accounts: state.accounts.map((account) =>
-        account.id === accountId ? { ...account, name } : account
-      ),
-    })),
-}));
+  )
+);
 
 /** Returns the currently active wallet account, if any. */
 export function selectActiveAccount(state: WalletState): WalletAccount | null {

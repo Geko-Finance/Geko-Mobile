@@ -1,11 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
-import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
+import type { Balance, StellarNetworkId, WalletAccount } from "@/src/domain/wallet";
 import {
   createCustodialAccount,
   recoverCustodialAccount,
 } from "@/src/services/api/cavos/cavos-account-factory";
+import { signTestCustodialPayment } from "@/src/services/api/cavos/cavos-test-payment";
 import type { CavosIdentity } from "@/src/services/api/cavos/cavos-types";
 import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
 import {
@@ -92,5 +93,11 @@ export function useRecoverCustodialWallet() {
           : { ...account, name: existing.name }
       );
     },
+  });
+}
+
+export function useSignTestCustodialPayment() {
+  return useMutation({
+    mutationFn: (account: WalletAccount) => signTestCustodialPayment(account),
   });
 }

@@ -1,3 +1,4 @@
+import "@/src/services/crypto/crypto-polyfill";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";

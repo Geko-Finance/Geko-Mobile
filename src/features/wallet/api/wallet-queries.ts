@@ -2,6 +2,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
 import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
+import {
+  createCustodialAccount,
+  recoverCustodialAccount,
+} from "@/src/services/api/cavos/cavos-account-factory";
+import type { CavosIdentity } from "@/src/services/api/cavos/cavos-types";
 import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
 import {
   getStellarClient,
@@ -53,6 +58,39 @@ export function useCreateTestWallet() {
         name: input.name.trim() || "Test Wallet",
         publicKey,
       });
+    },
+  });
+}
+
+/** Connects a Cavos custodial wallet, persists the session, and registers the account locally. */
+export function useCreateCustodialWallet() {
+  return useMutation({
+    mutationFn: async (input: { identity: CavosIdentity; name: string }) =>
+      createCustodialAccount(input.identity, input.name),
+    onSuccess: (account) => {
+      useWalletStore.getState().addAccount(account);
+    },
+  });
+}
+
+/**
+ * Reconnects a Cavos custodial wallet for the given identity and registers it locally.
+ * Preserves an existing local display name when the account is already known.
+ */
+export function useRecoverCustodialWallet() {
+  return useMutation({
+    mutationFn: async (input: { identity: CavosIdentity }) =>
+      recoverCustodialAccount(input.identity),
+    onSuccess: (account) => {
+      const existing = useWalletStore
+        .getState()
+        .accounts.find((entry) => entry.id === account.id);
+
+      useWalletStore.getState().addAccount(
+        existing === undefined
+          ? account
+          : { ...account, name: existing.name }
+      );
     },
   });
 }

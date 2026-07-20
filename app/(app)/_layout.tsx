@@ -16,6 +16,7 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="wallet/index" />
       <Stack.Screen name="wallet/[accountId]" />
       <Stack.Screen name="payments/send" />
       <Stack.Screen name="payments/confirm" />

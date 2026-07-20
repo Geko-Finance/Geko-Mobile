@@ -32,7 +32,14 @@ function trimTrailingZeros(amount: string): string {
 }
 
 function formatCustodyLabel(custody: WalletCustody): string {
-  return custody === "custodial" ? "Custodial" : "Self-custody";
+  switch (custody) {
+    case "custodial":
+      return "Custodial";
+    case "non_custodial":
+      return "Self-custody";
+    case "watch_only":
+      return "Watch-only";
+  }
 }
 
 function formatNetworkLabel(networkId: StellarNetworkId): string {

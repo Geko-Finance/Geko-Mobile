@@ -7,6 +7,7 @@
     "icon": "./src/assets/icons/iconAppSquare.png",
     "scheme": "gekomobile",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gekomobile.gekomobile",
@@ -21,6 +22,7 @@
         "backgroundImage": "./src/assets/icons/iconAppSquare.png",
         "monochromeImage": "./src/assets/icons/iconAppSquare.png"
       },
+      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.gekomobile.gekomobile"
     },
@@ -45,9 +47,7 @@
       "expo-font",
       "expo-localization",
       "expo-secure-store",
-      "expo-web-browser",
-      "expo-image",
-      "expo-status-bar"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

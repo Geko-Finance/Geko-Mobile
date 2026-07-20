@@ -22,6 +22,8 @@
     "@gluestack-ui/utils": "^3.0.11",
     "@gorhom/bottom-sheet": "^5.2.6",
     "@legendapp/motion": "^2.5.1",
+    "@stellar/stellar-sdk": "15.0.1",
+    "@stellar/typescript-wallet-sdk": "^3.0.1",
     "@tanstack/react-query": "^5.101.0",
     "babel-plugin-module-resolver": "^5.0.2",
     "expo": "~56.0.9",

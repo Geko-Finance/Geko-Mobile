@@ -8,8 +8,8 @@ import {
   Repeat2,
   Send,
 } from "lucide-react-native";
-import { Animated, Image, StyleSheet, Text, View } from "react-native";
-import { useMemo } from "react";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -19,12 +19,21 @@ import {
 import { QuickAction } from "@/src/features/home/components/QuickAction";
 import { TransactionRow } from "@/src/features/home/components/TransactionRow";
 
+type TransactionPeriod = "today" | "week" | "month";
+
+const PERIOD_OPTIONS: { label: string; value: TransactionPeriod }[] = [
+  { label: "Today", value: "today" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+];
+
 const TRANSACTIONS = [
   {
     amount: "+$30,00",
     amountTone: "green" as const,
     icon: Repeat2,
     meta: "Today - 6:22 AM",
+    period: "today" as const,
     title: "Jose Sanchez",
   },
   {
@@ -32,6 +41,7 @@ const TRANSACTIONS = [
     amountTone: "yellow" as const,
     icon: PiggyBank,
     meta: "Yesterday - 12:31 PM",
+    period: "week" as const,
     title: "Mexico Trip Budget",
   },
   {
@@ -39,6 +49,7 @@ const TRANSACTIONS = [
     amountTone: "red" as const,
     icon: Repeat2,
     meta: "Nov 9 - 15:01 PM",
+    period: "week" as const,
     title: "Christmas Gift",
   },
   {
@@ -46,6 +57,7 @@ const TRANSACTIONS = [
     amountTone: "green" as const,
     icon: Send,
     meta: "Nov 4 - 12:31 PM",
+    period: "week" as const,
     title: "Salary Bonus",
   },
   {
@@ -53,6 +65,7 @@ const TRANSACTIONS = [
     amountTone: "green" as const,
     icon: ArrowDown,
     meta: "Nov 2 - 9:15 AM",
+    period: "month" as const,
     title: "Freelance Project",
   },
   {
@@ -60,6 +73,7 @@ const TRANSACTIONS = [
     amountTone: "red" as const,
     icon: CircleDollarSign,
     meta: "Oct 31 - 8:04 PM",
+    period: "month" as const,
     title: "Coffee & Snacks",
   },
   {
@@ -67,6 +81,7 @@ const TRANSACTIONS = [
     amountTone: "green" as const,
     icon: ArrowDown,
     meta: "Oct 29 - 10:00 AM",
+    period: "month" as const,
     title: "Payroll Deposit",
   },
   {
@@ -74,6 +89,7 @@ const TRANSACTIONS = [
     amountTone: "yellow" as const,
     icon: PiggyBank,
     meta: "Oct 26 - 2:45 PM",
+    period: "month" as const,
     title: "Emergency Fund",
   },
   {
@@ -81,12 +97,15 @@ const TRANSACTIONS = [
     amountTone: "red" as const,
     icon: Send,
     meta: "Oct 22 - 7:18 PM",
+    period: "month" as const,
     title: "Dinner Transfer",
   },
 ];
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<TransactionPeriod>("month");
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const stickyOpacity = useMemo(
     () =>
@@ -112,6 +131,21 @@ export function HomeScreen() {
         useNativeDriver: true,
       }),
     [scrollY]
+  );
+  const visibleTransactions = useMemo(
+    () =>
+      TRANSACTIONS.filter((transaction) => {
+        if (selectedPeriod === "month") {
+          return true;
+        }
+
+        if (selectedPeriod === "week") {
+          return transaction.period === "today" || transaction.period === "week";
+        }
+
+        return transaction.period === "today";
+      }),
+    [selectedPeriod]
   );
 
   return (
@@ -176,21 +210,35 @@ export function HomeScreen() {
         </View>
 
         <View className="mt-4 flex-row rounded-full border border-[#303033] p-1">
-          <View className="h-[42px] flex-1 items-center justify-center">
-            <Text className="text-[17px] font-bold text-[#9D9D9F]">Today</Text>
-          </View>
-          <View className="h-[42px] flex-1 items-center justify-center">
-            <Text className="text-[17px] font-bold text-[#9D9D9F]">Week</Text>
-          </View>
-          <View className="h-[42px] flex-1 items-center justify-center rounded-full bg-[#242426]">
-            <Text className="text-[17px] font-extrabold text-[#D8D8DC]">
-              Month
-            </Text>
-          </View>
+          {PERIOD_OPTIONS.map((option) => {
+            const isSelected = selectedPeriod === option.value;
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                className={`h-[42px] flex-1 items-center justify-center rounded-full ${
+                  isSelected ? "bg-[#242426]" : "bg-transparent"
+                }`}
+                key={option.value}
+                onPress={() => setSelectedPeriod(option.value)}
+              >
+                <Text
+                  className={`text-[17px] ${
+                    isSelected
+                      ? "font-extrabold text-[#D8D8DC]"
+                      : "font-bold text-[#9D9D9F]"
+                  }`}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214] pb-24">
-          {TRANSACTIONS.map((transaction) => (
+          {visibleTransactions.map((transaction) => (
             <TransactionRow
               key={`${transaction.meta}-${transaction.title}`}
               {...transaction}

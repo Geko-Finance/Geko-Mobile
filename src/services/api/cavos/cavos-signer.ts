@@ -1,8 +1,9 @@
+// Same XDR/tx primitives as stellar-sdk without the Node-only eventsource dependency that breaks Metro.
 import {
   FeeBumpTransaction,
   Operation,
   TransactionBuilder,
-} from "@stellar/stellar-sdk";
+} from "@stellar/stellar-base";
 
 import type {
   SignTransactionOptions,

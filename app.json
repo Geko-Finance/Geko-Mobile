@@ -45,9 +45,7 @@
       "expo-font",
       "expo-localization",
       "expo-secure-store",
-      "expo-web-browser",
-      "expo-image",
-      "expo-status-bar"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

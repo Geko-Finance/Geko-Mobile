@@ -92,8 +92,11 @@ export function computeSignatureHint(publicKey: string): Buffer {
  * operations, so an `"operations" in decoded` (or `decoded.operations === undefined`) check would
  * NOT actually distinguish it from a plain `Transaction` — it would silently let fee-bump
  * envelopes through. `instanceof` is the only check that reliably rejects them.
+ *
+ * Exported (not just used internally) so `src/domain/multisig/transaction-summary.ts` can reuse
+ * the same fee-bump-rejection behavior instead of duplicating it.
  */
-function decodeAsTransaction(
+export function decodeAsTransaction(
   envelopeXdr: string,
   networkPassphrase: string
 ): Transaction {
@@ -174,6 +177,95 @@ export function evaluatePendingTx(
 export function wouldRiskPermanentLockout(config: MultisigAccountConfig): boolean {
   const totalWeight = config.signers.reduce((sum, signer) => sum + signer.weight, 0);
   return totalWeight < config.thresholds.low;
+}
+
+/**
+ * True if this signer configuration's total weight would fall below its own HIGH threshold. This
+ * is a DIFFERENT risk than `wouldRiskPermanentLockout`: an account can be below `high` while still
+ * meeting `low`/`medium`, so it stays able to pay — but `SetOptions` (the ONLY operation type that
+ * can ever change signers or thresholds again, see `thresholdCategoryForOperationType`) always
+ * requires the account's HIGH threshold, regardless of what's being changed. A resulting config
+ * below its own high threshold is therefore a one-way door: the account can never add a signer
+ * back, lower a threshold, or unlock the master key again — it is permanently frozen for its own
+ * future configuration, even though it can still transact normally.
+ *
+ * Callers must check this IN ADDITION TO `wouldRiskPermanentLockout` before submitting any signer
+ * or threshold change (see `SignerManagementScreen`), and should warn with distinct wording from
+ * the low-threshold case: this is not "unable to sign anything", it's "unable to ever change
+ * signers/thresholds again".
+ */
+export function wouldFreezeAccountConfig(config: MultisigAccountConfig): boolean {
+  const totalWeight = config.signers.reduce((sum, signer) => sum + signer.weight, 0);
+  return totalWeight < config.thresholds.high;
+}
+
+/**
+ * A pure description of one proposed change to a signer configuration, used to compute a
+ * RESULTING config before submission — see `applySignerConfigChange`.
+ */
+export type SignerConfigChange =
+  | { readonly kind: "addOrUpdateSigner"; readonly publicKey: string; readonly weight: number }
+  | { readonly kind: "removeSigner"; readonly publicKey: string }
+  | { readonly kind: "setThresholds"; readonly thresholds: Partial<MultisigThresholds> };
+
+/**
+ * Computes the RESULTING `MultisigAccountConfig` after applying one proposed change, without
+ * submitting anything on-chain. This is the single source of truth for "what would this account's
+ * config look like after this change" — callers (see `SignerManagementScreen`) run the result
+ * through `wouldRiskPermanentLockout`/`wouldFreezeAccountConfig` before allowing submission, and
+ * must NOT reimplement this computation inline: it used to live as inline JSX logic in
+ * `SignerManagementScreen` and had a real, shipped bug there — appending rather than replacing an
+ * existing signer's entry when its weight was "edited" by re-adding the same key with a new
+ * weight, which silently undercounted the resulting total weight and bypassed the lockout check
+ * entirely. Keeping this here, pure and tested, is what prevents that class of bug from
+ * recurring.
+ *
+ * - `addOrUpdateSigner` mirrors Stellar's own `setOptions` signer semantics: a signer operation
+ *   for a key that's already a signer REPLACES that signer's entry (weight included) rather than
+ *   adding a second one — so any existing entry for `publicKey` is removed before the new one is
+ *   added.
+ * - `removeSigner` drops the signer entirely, matching how Horizon represents a weight-0 signer
+ *   (it simply isn't listed in the signers array) rather than keeping a zero-weight entry around.
+ * - `setThresholds` merges only the provided fields onto the current thresholds, leaving
+ *   unspecified fields unchanged — matching `ThresholdChange`'s optional-fields shape.
+ */
+export function applySignerConfigChange(
+  config: MultisigAccountConfig,
+  change: SignerConfigChange
+): MultisigAccountConfig {
+  switch (change.kind) {
+    case "addOrUpdateSigner":
+      return {
+        ...config,
+        signers: [
+          ...config.signers.filter((signer) => signer.publicKey !== change.publicKey),
+          { publicKey: change.publicKey, weight: change.weight },
+        ],
+      };
+    case "removeSigner":
+      return {
+        ...config,
+        signers: config.signers.filter((signer) => signer.publicKey !== change.publicKey),
+      };
+    case "setThresholds":
+      return {
+        ...config,
+        thresholds: { ...config.thresholds, ...change.thresholds },
+      };
+  }
+}
+
+/**
+ * Applies a sequence of changes in order, each computed against the result of the previous one —
+ * used when a single submission combines multiple changes (e.g. adding a signer and raising
+ * thresholds together, so an account never sits in an intermediate, under-thresholded state
+ * between two separate submissions).
+ */
+export function applySignerConfigChanges(
+  config: MultisigAccountConfig,
+  changes: readonly SignerConfigChange[]
+): MultisigAccountConfig {
+  return changes.reduce(applySignerConfigChange, config);
 }
 
 /** A stable identifier for a pending transaction, unchanged as signatures are added or merged. */

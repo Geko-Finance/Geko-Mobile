@@ -10,6 +10,8 @@ import {
 } from "@stellar/stellar-sdk";
 
 import {
+  applySignerConfigChange,
+  applySignerConfigChanges,
   computeSignatureHint,
   evaluatePendingTx,
   mergeSignatures,
@@ -17,6 +19,7 @@ import {
   requiredThresholdCategoryForOperations,
   requiredWeightForCategory,
   thresholdCategoryForOperationType,
+  wouldFreezeAccountConfig,
   wouldRiskPermanentLockout,
 } from "./threshold";
 import type { MultisigAccountConfig } from "./types";
@@ -258,6 +261,135 @@ describe("wouldRiskPermanentLockout", () => {
     };
 
     expect(wouldRiskPermanentLockout(config)).toBe(false);
+  });
+});
+
+describe("wouldFreezeAccountConfig", () => {
+  it("flags a config whose total weight is below the low threshold (existing lockout case, still works)", () => {
+    const config: MultisigAccountConfig = {
+      signers: [{ publicKey: Keypair.random().publicKey(), weight: 1 }],
+      thresholds: { low: 2, medium: 3, high: 4 },
+    };
+
+    expect(wouldFreezeAccountConfig(config)).toBe(true);
+  });
+
+  it("flags a config whose total weight meets low/medium but falls short of the high threshold", () => {
+    const config: MultisigAccountConfig = {
+      signers: [{ publicKey: Keypair.random().publicKey(), weight: 3 }],
+      thresholds: { low: 2, medium: 3, high: 4 },
+    };
+
+    // Still able to pay (meets low and medium) but can never run another SetOptions again.
+    expect(wouldRiskPermanentLockout(config)).toBe(false);
+    expect(wouldFreezeAccountConfig(config)).toBe(true);
+  });
+
+  it("does not flag a config whose total weight meets the high threshold", () => {
+    const config: MultisigAccountConfig = {
+      signers: [{ publicKey: Keypair.random().publicKey(), weight: 4 }],
+      thresholds: { low: 2, medium: 3, high: 4 },
+    };
+
+    expect(wouldFreezeAccountConfig(config)).toBe(false);
+  });
+});
+
+describe("applySignerConfigChange / applySignerConfigChanges", () => {
+  const masterKey = Keypair.random().publicKey();
+  const baseConfig: MultisigAccountConfig = {
+    signers: [{ publicKey: masterKey, weight: 2 }],
+    thresholds: { low: 2, medium: 2, high: 2 },
+  };
+
+  it("adds a brand-new signer without touching existing signers", () => {
+    const newSigner = Keypair.random().publicKey();
+
+    const result = applySignerConfigChange(baseConfig, {
+      kind: "addOrUpdateSigner",
+      publicKey: newSigner,
+      weight: 1,
+    });
+
+    expect(result.signers).toEqual([
+      { publicKey: masterKey, weight: 2 },
+      { publicKey: newSigner, weight: 1 },
+    ]);
+    expect(result.thresholds).toBe(baseConfig.thresholds);
+  });
+
+  it("replaces (not appends) an existing signer's entry when re-adding the same key with a new weight", () => {
+    // This is the exact scenario that previously broke: re-adding signerA's own key with a lower
+    // weight must REPLACE signerA's entry, matching Stellar's own setOptions semantics, not
+    // produce a second entry that double-counts total weight.
+    const signerA = Keypair.random().publicKey();
+    const config: MultisigAccountConfig = {
+      signers: [
+        { publicKey: masterKey, weight: 2 },
+        { publicKey: signerA, weight: 2 },
+      ],
+      thresholds: { low: 3, medium: 3, high: 3 },
+    };
+
+    const result = applySignerConfigChange(config, {
+      kind: "addOrUpdateSigner",
+      publicKey: signerA,
+      weight: 0,
+    });
+
+    expect(result.signers).toEqual([
+      { publicKey: masterKey, weight: 2 },
+      { publicKey: signerA, weight: 0 },
+    ]);
+    // Total weight is now 2, below the low threshold of 3 — the bug this guards against made the
+    // old (buggy) computation report a total of 4 instead, silently hiding the lockout risk.
+    expect(wouldRiskPermanentLockout(result)).toBe(true);
+  });
+
+  it("removes a signer entirely", () => {
+    const signerA = Keypair.random().publicKey();
+    const config: MultisigAccountConfig = {
+      signers: [
+        { publicKey: masterKey, weight: 2 },
+        { publicKey: signerA, weight: 1 },
+      ],
+      thresholds: { low: 2, medium: 2, high: 2 },
+    };
+
+    const result = applySignerConfigChange(config, {
+      kind: "removeSigner",
+      publicKey: signerA,
+    });
+
+    expect(result.signers).toEqual([{ publicKey: masterKey, weight: 2 }]);
+  });
+
+  it("merges only the provided threshold fields, leaving the rest unchanged", () => {
+    const result = applySignerConfigChange(baseConfig, {
+      kind: "setThresholds",
+      thresholds: { high: 5 },
+    });
+
+    expect(result.thresholds).toEqual({ low: 2, medium: 2, high: 5 });
+    expect(result.signers).toBe(baseConfig.signers);
+  });
+
+  it("applySignerConfigChanges folds multiple changes in order, e.g. adding a signer and raising thresholds together", () => {
+    const newSigner = Keypair.random().publicKey();
+
+    const result = applySignerConfigChanges(baseConfig, [
+      { kind: "addOrUpdateSigner", publicKey: newSigner, weight: 2 },
+      { kind: "setThresholds", thresholds: { low: 4, medium: 4, high: 4 } },
+    ]);
+
+    expect(result.signers).toEqual([
+      { publicKey: masterKey, weight: 2 },
+      { publicKey: newSigner, weight: 2 },
+    ]);
+    expect(result.thresholds).toEqual({ low: 4, medium: 4, high: 4 });
+    // Combined, this is now a genuine 2-of-2: neither signer alone can meet the new threshold.
+    expect(wouldRiskPermanentLockout(result)).toBe(false);
+    expect(wouldFreezeAccountConfig(result)).toBe(false);
   });
 });
 

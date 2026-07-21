@@ -119,8 +119,8 @@ export function ProposePaymentScreen() {
           <View className="mt-6 items-center rounded-[20px] bg-white p-5">
             <QRCode backgroundColor="white" color="black" size={220} value={shareUri} />
             <Text className="mt-4 max-w-[240px] text-center text-[13px] font-semibold text-black">
-              This threshold hasn't been met yet. Share this with a co-signer to collect the
-              next signature.
+              This threshold hasn&apos;t been met yet. Share this with a co-signer to collect
+              the next signature.
             </Text>
           </View>
         )}

@@ -19,6 +19,7 @@ import {
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
 import {
   useActiveNetworkId,
+  useCreateNonCustodialWallet,
   useCreateTestWallet,
 } from "@/src/features/wallet/api/wallet-queries";
 import {
@@ -54,6 +55,7 @@ export function WalletScreen() {
   const removeAccount = useWalletStore((state) => state.removeAccount);
   const networkId = useActiveNetworkId();
   const createTestWallet = useCreateTestWallet();
+  const createNonCustodialWallet = useCreateNonCustodialWallet();
 
   const [name, setName] = useState("");
   const [publicKey, setPublicKey] = useState("");
@@ -62,7 +64,10 @@ export function WalletScreen() {
   const networkLabel = formatNetworkLabel(networkId);
   const inlineError =
     validationError ??
-    (createTestWallet.isError ? createTestWallet.error.message : null);
+    (createTestWallet.isError ? createTestWallet.error.message : null) ??
+    (createNonCustodialWallet.isError
+      ? createNonCustodialWallet.error.message
+      : null);
 
   const handleWatchAddress = () => {
     createTestWallet.reset();
@@ -89,6 +94,18 @@ export function WalletScreen() {
   const handleCreateTestWallet = () => {
     setValidationError(null);
     createTestWallet.mutate(
+      { name: name.trim() },
+      {
+        onSuccess: () => {
+          setName("");
+        },
+      }
+    );
+  };
+
+  const handleCreateNonCustodialWallet = () => {
+    setValidationError(null);
+    createNonCustodialWallet.mutate(
       { name: name.trim() },
       {
         onSuccess: () => {
@@ -234,6 +251,32 @@ export function WalletScreen() {
               Watch address
             </Text>
           </Pressable>
+
+          <Pressable
+            accessibilityLabel="Create self-custody wallet"
+            accessibilityRole="button"
+            className="mt-3 self-start rounded-full bg-[#242426] px-4 py-2.5"
+            disabled={createNonCustodialWallet.isPending}
+            onPress={handleCreateNonCustodialWallet}
+          >
+            {createNonCustodialWallet.isPending ? (
+              <View className="flex-row items-center gap-2">
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text className="text-[14px] font-bold text-white">
+                  Creating…
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-[14px] font-bold text-white">
+                Create self-custody wallet
+              </Text>
+            )}
+          </Pressable>
+          <Text className="mt-3 text-[13px] font-semibold text-[#8E8E92]">
+            Generates a real key, stored securely on this device. Not funded
+            automatically — send it {networkLabel === "Mainnet" ? "real" : "test"}{" "}
+            XLM before using it to pay.
+          </Text>
 
           {networkId === "testnet" ? (
             <>

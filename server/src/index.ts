@@ -224,6 +224,68 @@ app.post("/api/cavos/trustline", async (req: Request, res: Response) => {
   }
 });
 
+app.get("/api/cavos/recovery-code", async (req: Request, res: Response) => {
+  const userId = req.query.userId;
+
+  if (typeof userId !== "string" || userId.trim().length === 0) {
+    res.status(400).json({ error: "userId query parameter is required" });
+    return;
+  }
+
+  try {
+    const code = await getRecoveryCode(userId.trim());
+    if (code === undefined) {
+      res.status(404).json({ error: "No recovery code on file for this account" });
+      return;
+    }
+    res.status(200).json({ code });
+  } catch (error) {
+    console.error("GET /api/cavos/recovery-code failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.post("/api/cavos/recover-device", async (req: Request, res: Response) => {
+  const { userId, code } = req.body as {
+    userId?: unknown;
+    code?: unknown;
+  };
+
+  if (typeof userId !== "string" || userId.trim().length === 0) {
+    res.status(400).json({ error: "userId is required and must be a non-empty string" });
+    return;
+  }
+
+  if (typeof code !== "string" || code.trim().length === 0) {
+    res.status(400).json({ error: "code is required and must be a non-empty string" });
+    return;
+  }
+
+  try {
+    const wallet = await Cavos.connect({
+      appId: CAVOS_APP_ID,
+      appSalt: CAVOS_APP_SALT,
+      chain: "stellar",
+      identity: { userId: userId.trim() },
+      network: CAVOS_NETWORK,
+    });
+
+    if (wallet.chain !== "stellar") {
+      throw new Error("Expected Stellar wallet from Cavos.connect with chain: stellar");
+    }
+
+    if (wallet.status === "needs-device-approval") {
+      await wallet.approveThisDeviceWithRecovery(code.trim());
+    }
+
+    await saveRecoveryCode(userId.trim(), code.trim());
+    res.status(200).json({ address: wallet.address, status: "ready" });
+  } catch (error) {
+    console.error("POST /api/cavos/recover-device failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
 app.get("/api/cavos/balance", async (req: Request, res: Response) => {
   const userId = req.query.userId;
 

@@ -31,6 +31,8 @@ export interface CavosClient {
     code: string,
     issuer: string
   ): Promise<{ hash: string }>;
+  getRecoveryCode(session: CavosSession): Promise<string | null>;
+  recoverWithCode(identity: CavosIdentity, code: string): Promise<CavosSession>;
   getBalance(session: CavosSession): Promise<bigint>;
 }
 
@@ -151,6 +153,60 @@ const createRealCavosClient = (): CavosClient => ({
 
     const { hash } = (await response.json()) as { hash: string };
     return { hash };
+  },
+
+  async getRecoveryCode(session: CavosSession): Promise<string | null> {
+    const response = await fetch(
+      cavosApiUrl(
+        `/api/cavos/recovery-code?userId=${encodeURIComponent(session.userId)}`
+      )
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (response.status === 409) {
+      throw new CavosSessionExpiredError(
+        "Cavos session is no longer valid; reconnect to continue"
+      );
+    }
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos recovery-code fetch failed (${response.status})`
+      );
+    }
+
+    const { code } = (await response.json()) as { code: string };
+    return code;
+  },
+
+  async recoverWithCode(
+    identity: CavosIdentity,
+    code: string
+  ): Promise<CavosSession> {
+    const response = await fetch(cavosApiUrl("/api/cavos/recover-device"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: identity.userId,
+        code,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos device recovery failed (${response.status})`
+      );
+    }
+
+    const { address, status } = (await response.json()) as {
+      address: string;
+      status: CavosSession["status"];
+    };
+
+    return { address, status, userId: identity.userId };
   },
 
   async getBalance(session: CavosSession): Promise<bigint> {

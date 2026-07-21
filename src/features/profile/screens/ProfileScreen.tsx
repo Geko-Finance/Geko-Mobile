@@ -1,16 +1,22 @@
+import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
 import { useMeQuery } from "@/src/features/auth/api/auth-queries";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
+import {
+  useRecoverWithCode,
+  useViewRecoveryCode,
+} from "@/src/features/profile/api/recovery-queries";
 import {
   useAccountBalances,
   useActiveNetworkId,
@@ -43,6 +49,12 @@ export function ProfileScreen() {
   const balances = useAccountBalances(activeAccount?.publicKey);
   const networkId = useActiveNetworkId();
   const fundAccount = useFundTestnetAccount();
+  const viewRecoveryCode = useViewRecoveryCode();
+  const recoverWithCode = useRecoverWithCode();
+  const [revealedCode, setRevealedCode] = useState<string | null>(null);
+  const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [showRecoverInput, setShowRecoverInput] = useState(false);
+  const [copiedRecoveryCode, setCopiedRecoveryCode] = useState(false);
   const displayName = meQuery.data?.fullName ?? session?.user.email ?? "Customer";
   const formattedBalance = useMemo(() => {
     const nativeBalance = balances.data?.find((b) => b.asset.type === "native");
@@ -56,6 +68,16 @@ export function ProfileScreen() {
   const otherBalances = (balances.data ?? []).filter(
     (b) => b.asset.type !== "native",
   );
+
+  const handleCopyRecoveryCode = async () => {
+    if (revealedCode === null) {
+      return;
+    }
+
+    await Clipboard.setStringAsync(revealedCode);
+    setCopiedRecoveryCode(true);
+    setTimeout(() => setCopiedRecoveryCode(false), 2000);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -138,6 +160,135 @@ export function ProfileScreen() {
                     </Text>
                   ) : null}
                 </>
+              ) : null}
+              {account.custody === "custodial" ? (
+                <View className="mt-4">
+                  <Pressable
+                    accessibilityRole="button"
+                    className="self-start rounded-full bg-[#242426] px-4 py-2.5"
+                    disabled={viewRecoveryCode.isPending}
+                    onPress={() =>
+                      viewRecoveryCode.mutate(account, {
+                        onSuccess: (code) => setRevealedCode(code),
+                      })
+                    }
+                  >
+                    {viewRecoveryCode.isPending ? (
+                      <View className="flex-row items-center gap-2">
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                        <Text className="text-[14px] font-bold text-white">
+                          Loading…
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-[14px] font-bold text-white">
+                        View recovery code
+                      </Text>
+                    )}
+                  </Pressable>
+
+                  {viewRecoveryCode.isSuccess && revealedCode === null ? (
+                    <Text className="mt-2 text-[13px] font-semibold text-[#8E8E92]">
+                      No recovery code on file for this account yet.
+                    </Text>
+                  ) : null}
+                  {viewRecoveryCode.isError ? (
+                    <Text className="mt-2 text-[13px] font-semibold text-[#FF6B6B]">
+                      Couldn&apos;t load recovery code — please try again.
+                    </Text>
+                  ) : null}
+
+                  {revealedCode !== null ? (
+                    <View className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3">
+                      <Text className="text-[13px] font-semibold text-[#8E8E92]">
+                        Save this somewhere safe — anyone with this code can
+                        approve a new device for this wallet.
+                      </Text>
+                      <Text
+                        className="mt-2 text-[15px] font-bold text-white"
+                        selectable
+                      >
+                        {revealedCode}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        className="mt-3 self-start rounded-full bg-[#242426] px-3 py-2"
+                        onPress={handleCopyRecoveryCode}
+                      >
+                        <Text className="text-[13px] font-bold text-white">
+                          {copiedRecoveryCode ? "Copied!" : "Copy code"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  <Pressable
+                    accessibilityRole="button"
+                    className="mt-3 self-start rounded-full bg-[#242426] px-4 py-2.5"
+                    onPress={() => setShowRecoverInput((prev) => !prev)}
+                  >
+                    <Text className="text-[14px] font-bold text-white">
+                      Recover with code
+                    </Text>
+                  </Pressable>
+
+                  {showRecoverInput ? (
+                    <View className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3">
+                      <TextInput
+                        className="rounded-lg bg-[#242426] px-3 py-2.5 text-[14px] font-semibold text-white"
+                        placeholder="Paste your recovery code"
+                        placeholderTextColor="#6E6E72"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        value={recoveryCodeInput}
+                        onChangeText={setRecoveryCodeInput}
+                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        className="mt-3 self-start rounded-full bg-[#237BFF] px-4 py-2.5"
+                        disabled={
+                          recoveryCodeInput.trim().length === 0 ||
+                          recoverWithCode.isPending
+                        }
+                        onPress={() =>
+                          recoverWithCode.mutate(
+                            { account, code: recoveryCodeInput.trim() },
+                            {
+                              onSuccess: () => {
+                                setShowRecoverInput(false);
+                                setRecoveryCodeInput("");
+                              },
+                            },
+                          )
+                        }
+                      >
+                        {recoverWithCode.isPending ? (
+                          <View className="flex-row items-center gap-2">
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                            <Text className="text-[14px] font-bold text-white">
+                              Recovering…
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text className="text-[14px] font-bold text-white">
+                            Approve this device
+                          </Text>
+                        )}
+                      </Pressable>
+                      {recoverWithCode.isError ? (
+                        <Text className="mt-2 text-[13px] font-semibold text-[#FF6B6B]">
+                          That code didn&apos;t work — please check it and try
+                          again.
+                        </Text>
+                      ) : null}
+                      {recoverWithCode.isSuccess ? (
+                        <Text className="mt-2 text-[13px] font-semibold text-[#5BED97]">
+                          Device approved.
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
               ) : null}
             </>
           ) : (

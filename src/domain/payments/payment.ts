@@ -1,4 +1,4 @@
-import type { Money } from "./money";
+import type { Money } from "../money";
 
 export type PaymentStatus = "draft" | "pending" | "completed" | "failed";
 

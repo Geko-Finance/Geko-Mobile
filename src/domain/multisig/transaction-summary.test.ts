@@ -6,13 +6,14 @@ import {
   Networks,
   Operation,
   TransactionBuilder,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 import { describeTransactionOperations } from "./transaction-summary";
 
 const NETWORK_PASSPHRASE = Networks.TESTNET;
 
-function buildXdr(sourcePublicKey: string, operations: ReturnType<typeof Operation.payment>[]): string {
+function buildXdr(sourcePublicKey: string, operations: xdr.Operation[]): string {
   const account = new Account(sourcePublicKey, "0");
   let builder = new TransactionBuilder(account, {
     fee: "100",
@@ -147,6 +148,85 @@ describe("describeTransactionOperations", () => {
         highThreshold: 4,
         masterWeight: 0,
         homeDomain: undefined,
+      },
+    ]);
+  });
+
+  it("summarizes an accountMerge operation, showing the destination it transfers the entire balance to", () => {
+    const source = Keypair.random();
+    const destination = Keypair.random();
+
+    const xdr = buildXdr(source.publicKey(), [
+      Operation.accountMerge({ destination: destination.publicKey() }),
+    ]);
+
+    const summaries = describeTransactionOperations(xdr, NETWORK_PASSPHRASE);
+
+    expect(summaries).toEqual([
+      { type: "accountMerge", destination: destination.publicKey() },
+    ]);
+  });
+
+  it("summarizes a pathPaymentStrictReceive operation (sendMax / exact destAmount)", () => {
+    const source = Keypair.random();
+    const destination = Keypair.random();
+    const issuer = Keypair.random();
+
+    const xdr = buildXdr(source.publicKey(), [
+      Operation.pathPaymentStrictReceive({
+        sendAsset: Asset.native(),
+        sendMax: "50",
+        destination: destination.publicKey(),
+        destAsset: new Asset("USDC", issuer.publicKey()),
+        destAmount: "10",
+        path: [],
+      }),
+    ]);
+
+    const summaries = describeTransactionOperations(xdr, NETWORK_PASSPHRASE);
+
+    expect(summaries).toEqual([
+      {
+        type: "pathPaymentStrictReceive",
+        destination: destination.publicKey(),
+        sendAssetCode: "XLM",
+        sendAssetIssuer: undefined,
+        destAssetCode: "USDC",
+        destAssetIssuer: issuer.publicKey(),
+        sendAmount: "50.0000000",
+        destAmount: "10.0000000",
+      },
+    ]);
+  });
+
+  it("summarizes a pathPaymentStrictSend operation (exact sendAmount / destMin)", () => {
+    const source = Keypair.random();
+    const destination = Keypair.random();
+    const issuer = Keypair.random();
+
+    const xdr = buildXdr(source.publicKey(), [
+      Operation.pathPaymentStrictSend({
+        sendAsset: new Asset("USDC", issuer.publicKey()),
+        sendAmount: "10",
+        destination: destination.publicKey(),
+        destAsset: Asset.native(),
+        destMin: "45",
+        path: [],
+      }),
+    ]);
+
+    const summaries = describeTransactionOperations(xdr, NETWORK_PASSPHRASE);
+
+    expect(summaries).toEqual([
+      {
+        type: "pathPaymentStrictSend",
+        destination: destination.publicKey(),
+        sendAssetCode: "USDC",
+        sendAssetIssuer: issuer.publicKey(),
+        destAssetCode: "XLM",
+        destAssetIssuer: undefined,
+        sendAmount: "10.0000000",
+        destAmount: "45.0000000",
       },
     ]);
   });

@@ -33,7 +33,56 @@ export interface SetOptionsOperationSummary {
   readonly homeDomain?: string;
 }
 
-/** A human-decodable summary of any operation type this app doesn't have a dedicated summary for. */
+/** A human-decodable summary of an `accountMerge` operation — transfers the ENTIRE source balance to `destination` and permanently deletes the source account. */
+export interface AccountMergeOperationSummary {
+  readonly type: "accountMerge";
+  readonly destination: string;
+}
+
+/**
+ * The shared shape of a `pathPaymentStrictReceive`/`pathPaymentStrictSend` summary — a payment
+ * that converts between assets along a path, still moving value to `destination` just like a
+ * plain `payment`. The two variants (defined as separate interfaces below, each with its own
+ * singleton `type` literal, NOT a single interface with a two-value `type` union — TypeScript's
+ * discriminated-union narrowing on `OperationSummary` only works per-member when each member's
+ * discriminant is a single literal) bound the amount from opposite ends:
+ * - `pathPaymentStrictReceive`: `sendAmount` is the MOST the sender is willing to send;
+ *   `destAmount` is the EXACT amount the destination receives.
+ * - `pathPaymentStrictSend`: `sendAmount` is the EXACT amount sent; `destAmount` is the LEAST the
+ *   destination must receive.
+ */
+interface PathPaymentOperationSummaryFields {
+  readonly destination: string;
+  readonly sendAssetCode: string;
+  readonly sendAssetIssuer?: string;
+  readonly destAssetCode: string;
+  readonly destAssetIssuer?: string;
+  readonly sendAmount: string;
+  readonly destAmount: string;
+}
+
+export interface PathPaymentStrictReceiveOperationSummary
+  extends PathPaymentOperationSummaryFields {
+  readonly type: "pathPaymentStrictReceive";
+}
+
+export interface PathPaymentStrictSendOperationSummary
+  extends PathPaymentOperationSummaryFields {
+  readonly type: "pathPaymentStrictSend";
+}
+
+export type PathPaymentOperationSummary =
+  | PathPaymentStrictReceiveOperationSummary
+  | PathPaymentStrictSendOperationSummary;
+
+/**
+ * A human-decodable summary of any operation type this app doesn't have a dedicated summary for
+ * (e.g. `changeTrust`, `manageSellOffer`, `clawback`, `invokeHostFunction`). Deliberately does NOT
+ * try to classify which of these are "safe" — the UI renders a uniform, prominent caution for
+ * every one of these, since this list can't be assumed exhaustive and several of them (trustline,
+ * offer, and smart-contract-invocation operations) can move or lock up value just as much as a
+ * payment can.
+ */
 export interface OtherOperationSummary {
   readonly type: "other";
   readonly operationType: string;
@@ -42,6 +91,8 @@ export interface OtherOperationSummary {
 export type OperationSummary =
   | PaymentOperationSummary
   | SetOptionsOperationSummary
+  | AccountMergeOperationSummary
+  | PathPaymentOperationSummary
   | OtherOperationSummary;
 
 function summarizePaymentOperation(operation: Operation.Payment): PaymentOperationSummary {
@@ -76,13 +127,55 @@ function summarizeSetOptionsOperation(
   };
 }
 
+function summarizeAccountMergeOperation(
+  operation: Operation.AccountMerge
+): AccountMergeOperationSummary {
+  return { type: "accountMerge", destination: operation.destination };
+}
+
+function summarizePathPaymentOperation(
+  operation: Operation.PathPaymentStrictReceive | Operation.PathPaymentStrictSend
+): PathPaymentOperationSummary {
+  const sendAssetCode = operation.sendAsset.isNative() ? "XLM" : operation.sendAsset.code;
+  const sendAssetIssuer = operation.sendAsset.isNative() ? undefined : operation.sendAsset.issuer;
+  const destAssetCode = operation.destAsset.isNative() ? "XLM" : operation.destAsset.code;
+  const destAssetIssuer = operation.destAsset.isNative() ? undefined : operation.destAsset.issuer;
+
+  if (operation.type === "pathPaymentStrictSend") {
+    return {
+      type: "pathPaymentStrictSend",
+      destination: operation.destination,
+      sendAssetCode,
+      sendAssetIssuer,
+      destAssetCode,
+      destAssetIssuer,
+      // Exact amount sent; destMin is the least the destination is guaranteed to receive.
+      sendAmount: operation.sendAmount,
+      destAmount: operation.destMin,
+    };
+  }
+
+  return {
+    type: "pathPaymentStrictReceive",
+    destination: operation.destination,
+    sendAssetCode,
+    sendAssetIssuer,
+    destAssetCode,
+    destAssetIssuer,
+    // sendMax is the most the sender is willing to send; destAmount is the exact amount received.
+    sendAmount: operation.sendMax,
+    destAmount: operation.destAmount,
+  };
+}
+
 /**
  * Decodes an envelope XDR's operations into human-decodable summaries, so a co-signer can see
- * what a pending transaction actually does (destination/amount for a payment; what's changing for
- * a signer/threshold change) before Sign/Submit — rather than blind-signing based only on
- * collected-weight counts. Throws on a fee-bump envelope, same as `evaluatePendingTx` (see
- * `decodeAsTransaction`'s docblock for why `instanceof FeeBumpTransaction` is the only reliable
- * check).
+ * what a pending transaction actually does (destination/amount for a payment or path payment;
+ * destination for an account merge, which transfers the ENTIRE balance and deletes the account;
+ * what's changing for a signer/threshold change) before Sign/Submit — rather than blind-signing
+ * based only on collected-weight counts. Throws on a fee-bump envelope, same as
+ * `evaluatePendingTx` (see `decodeAsTransaction`'s docblock for why `instanceof
+ * FeeBumpTransaction` is the only reliable check).
  */
 export function describeTransactionOperations(
   envelopeXdr: string,
@@ -96,6 +189,11 @@ export function describeTransactionOperations(
         return summarizePaymentOperation(operation);
       case "setOptions":
         return summarizeSetOptionsOperation(operation);
+      case "accountMerge":
+        return summarizeAccountMergeOperation(operation);
+      case "pathPaymentStrictReceive":
+      case "pathPaymentStrictSend":
+        return summarizePathPaymentOperation(operation);
       default:
         return { type: "other", operationType: operation.type };
     }

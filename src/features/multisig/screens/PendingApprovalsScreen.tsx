@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import QRCode from "react-native-qrcode-svg";
 
 import { describeTransactionOperations, evaluatePendingTx } from "@/src/domain/multisig";
-import type { OperationSummary, PendingTx } from "@/src/domain/multisig";
+import type { OperationSummary, PendingTx, ThresholdEvaluation } from "@/src/domain/multisig";
 import { encodeSep7TxRequest } from "@/src/domain/payments";
 import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
 import { useWalletAccount } from "@/src/features/wallet/state/wallet-store";
@@ -20,21 +20,36 @@ function formatPublicKey(publicKey: string): string {
   return `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
 }
 
+/** Formats an asset code, appending a shortened issuer address when it's not the native asset. */
+function formatAssetLabel(code: string, issuer: string | undefined): string {
+  return issuer === undefined ? code : `${code} (${formatPublicKey(issuer)})`;
+}
+
 /**
  * Renders one decoded operation as human-readable line(s), so a co-signer can see exactly what
  * they're about to Sign/Submit rather than only a collected-weight count. See
  * `describeTransactionOperations`'s docblock for why this matters: a shared/scanned pending
- * transaction could otherwise be a `setOptions` adding an attacker as a signer, or a payment to an
- * unexpected address, with zero visibility before signing.
+ * transaction could otherwise be a `setOptions` adding an attacker as a signer, an `accountMerge`
+ * (transfers the ENTIRE balance and deletes the account), or a payment to an unexpected address,
+ * with zero visibility before signing.
  */
 function describeOperationForDisplay(summary: OperationSummary): string {
   if (summary.type === "payment") {
-    const assetLabel =
-      summary.assetIssuer === undefined
-        ? summary.assetCode
-        : `${summary.assetCode} (${formatPublicKey(summary.assetIssuer)})`;
+    return `Pay ${summary.amount} ${formatAssetLabel(summary.assetCode, summary.assetIssuer)} to ${formatPublicKey(summary.destination)}`;
+  }
 
-    return `Pay ${summary.amount} ${assetLabel} to ${formatPublicKey(summary.destination)}`;
+  if (summary.type === "accountMerge") {
+    return `Merges this account into ${formatPublicKey(summary.destination)} — transfers its ENTIRE balance there and permanently deletes this account`;
+  }
+
+  if (summary.type === "pathPaymentStrictReceive" || summary.type === "pathPaymentStrictSend") {
+    const sendAssetLabel = formatAssetLabel(summary.sendAssetCode, summary.sendAssetIssuer);
+    const destAssetLabel = formatAssetLabel(summary.destAssetCode, summary.destAssetIssuer);
+    const destination = formatPublicKey(summary.destination);
+
+    return summary.type === "pathPaymentStrictSend"
+      ? `Sends ${summary.sendAmount} ${sendAssetLabel}, converted along a path, delivering at least ${summary.destAmount} ${destAssetLabel} to ${destination}`
+      : `Sends up to ${summary.sendAmount} ${sendAssetLabel}, converted along a path, delivering exactly ${summary.destAmount} ${destAssetLabel} to ${destination}`;
   }
 
   if (summary.type === "setOptions") {
@@ -75,7 +90,11 @@ function describeOperationForDisplay(summary: OperationSummary): string {
     return lines.length > 0 ? lines.join("\n") : "Changes account options";
   }
 
-  return `${summary.operationType} operation`;
+  // "other" catch-all: this app has no dedicated summary for this operation type (e.g.
+  // changeTrust, manageSellOffer, clawback, invokeHostFunction). Rather than a bland type name
+  // that could read as harmless, give a prominent, explicit caution — several of these operation
+  // types can move or lock up value just as much as a payment can.
+  return `⚠️ Contains a "${summary.operationType}" operation this app can't fully summarize. Review it carefully before signing — it may move funds or change account settings in ways not shown here.`;
 }
 
 /** Clears one key from a `Record`-shaped piece of state, used to reset a per-row error before retrying that row's action. */
@@ -180,12 +199,6 @@ export function PendingApprovalsScreen() {
         ) : null}
 
         {pendingTxs.map((pendingTx) => {
-          const evaluation = evaluatePendingTx(
-            pendingTx.envelopeXdr,
-            pendingTx.networkPassphrase,
-            config
-          );
-          const hasSigned = evaluation.signedBy.includes(account.publicKey);
           const shareUri = shareUriByTxId[pendingTx.id];
           const isSigning = signingTxId === pendingTx.id;
           const isSubmitting = submittingTxId === pendingTx.id;
@@ -193,26 +206,38 @@ export function PendingApprovalsScreen() {
           const submitError = submitErrorByTxId[pendingTx.id];
           const txLabel = pendingTx.id.slice(0, 8);
 
-          // Decode what this transaction actually does BEFORE any Sign/Submit control is even
-          // shown — a co-signer must never be asked to authorize a transaction with only a
-          // weight count and no visibility into its contents (see `describeTransactionOperations`
-          // for why: a shared/scanned XDR could otherwise be an arbitrary payment or a `setOptions`
-          // adding an attacker as a signer). If it can't be decoded at all, treat that as reason
-          // to block signing/submitting, not to fall back to blind-signing.
+          // Decode this transaction ONCE, in ONE try/catch, covering everything this row needs
+          // (both weight evaluation and the human-readable operation summary) — both rely on the
+          // exact same underlying decode (`decodeAsTransaction` in the domain layer), which throws
+          // on a fee-bump or malformed envelope. Evaluating outside this guard would let a single
+          // corrupt/undecodable persisted `envelopeXdr` (e.g. from an interrupted AsyncStorage
+          // write) throw during render and take down the ENTIRE pending-approvals list, not just
+          // this row. On failure, both evaluation and description are skipped for this row (never
+          // fall back to blind-signing with an unevaluated weight count) and Sign/Submit are
+          // disabled.
+          let evaluation: ThresholdEvaluation | null = null;
           let operationSummaries: OperationSummary[] | null = null;
           let describeError: string | null = null;
           try {
+            evaluation = evaluatePendingTx(
+              pendingTx.envelopeXdr,
+              pendingTx.networkPassphrase,
+              config
+            );
             operationSummaries = describeTransactionOperations(
               pendingTx.envelopeXdr,
               pendingTx.networkPassphrase
             );
           } catch (thrown) {
+            evaluation = null;
+            operationSummaries = null;
             describeError =
               thrown instanceof Error
                 ? thrown.message
                 : "Unable to decode this transaction's contents.";
           }
           const canSignOrSubmit = describeError === null;
+          const hasSigned = evaluation !== null && evaluation.signedBy.includes(account.publicKey);
 
           return (
             <View
@@ -220,13 +245,17 @@ export function PendingApprovalsScreen() {
               className="mt-6 overflow-hidden rounded-[20px] bg-[#121214] px-4 py-4"
             >
               <Text className="text-[15px] font-bold text-white">
-                {evaluation.collectedWeight} / {evaluation.requiredWeight} weight collected
+                {evaluation !== null
+                  ? `${evaluation.collectedWeight} / ${evaluation.requiredWeight} weight collected`
+                  : "Unable to evaluate signatures"}
               </Text>
               <Text className="mt-1 text-[13px] font-semibold text-[#8E8E92]">
                 Signed by:{" "}
-                {evaluation.signedBy.length === 0
-                  ? "no one yet"
-                  : evaluation.signedBy.map(formatPublicKey).join(", ")}
+                {evaluation === null
+                  ? "unknown"
+                  : evaluation.signedBy.length === 0
+                    ? "no one yet"
+                    : evaluation.signedBy.map(formatPublicKey).join(", ")}
               </Text>
 
               <View className="mt-4 rounded-[16px] bg-[#1E1E20] px-4 py-3">
@@ -281,7 +310,7 @@ export function PendingApprovalsScreen() {
                   accessibilityLabel={`Submit transaction ${txLabel}`}
                   accessibilityRole="button"
                   className="rounded-full bg-[#5BED97] px-4 py-2.5"
-                  disabled={!evaluation.isSatisfied || isSubmitting || !canSignOrSubmit}
+                  disabled={evaluation === null || !evaluation.isSatisfied || isSubmitting || !canSignOrSubmit}
                   onPress={() => {
                     void handleSubmit(pendingTx);
                   }}

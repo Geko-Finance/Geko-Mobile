@@ -5,6 +5,8 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { decodeSep7Uri } from "@/src/domain/payments";
+import { usePendingTxStore } from "@/src/features/multisig/state/pending-tx-store";
+import { useWalletAccounts } from "@/src/features/wallet/state/wallet-store";
 
 export function ScanPaymentScreen() {
   const router = useRouter();
@@ -12,6 +14,7 @@ export function ScanPaymentScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanError, setScanError] = useState<string | null>(null);
   const hasScannedRef = useRef(false);
+  const accounts = useWalletAccounts();
 
   if (!permission) {
     return <View className="flex-1 bg-black" />;
@@ -63,8 +66,29 @@ export function ScanPaymentScreen() {
     try {
       const request = decodeSep7Uri(data);
 
-      if (request.kind !== "pay") {
-        setScanError("This QR is a signed-transaction request, not a payment request.");
+      if (request.kind === "tx") {
+        const targetAccount =
+          request.pubkey !== undefined
+            ? accounts.find((entry) => entry.publicKey === request.pubkey)
+            : undefined;
+
+        if (targetAccount === undefined) {
+          setScanError(
+            request.pubkey !== undefined
+              ? "This transaction is for an account that isn't in your wallet."
+              : "This transaction doesn't specify which account should sign — add it to a pending list manually isn't supported yet."
+          );
+          return;
+        }
+
+        hasScannedRef.current = true;
+        usePendingTxStore
+          .getState()
+          .upsertPendingTx(targetAccount.id, request.xdr, request.networkPassphrase);
+        router.push({
+          pathname: "/multisig/pending",
+          params: { accountId: targetAccount.id },
+        });
         return;
       }
 

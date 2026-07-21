@@ -55,6 +55,8 @@ export function decodeSep7Uri(uri: string): Sep7Request {
       throw new Error("Not a valid SEP-7 URI: pay request has no destination");
     }
 
+    assertValidAssetPair(parsed.assetCode, parsed.assetIssuer);
+
     return {
       kind: "pay",
       destination: parsed.destination,

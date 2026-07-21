@@ -82,4 +82,10 @@ describe("decodeSep7Uri", () => {
       /valid SEP-7/i
     );
   });
+
+  it("throws on a pay URI with asset_code but no asset_issuer", () => {
+    const uri = `web+stellar:pay?destination=${DESTINATION}&asset_code=USDC`;
+
+    expect(() => decodeSep7Uri(uri)).toThrow(/asset_issuer/i);
+  });
 });

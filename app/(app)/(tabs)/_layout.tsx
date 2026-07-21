@@ -19,6 +19,10 @@ export default function AppTabsLayout() {
         <Icon src={require("./assets/tab-invest.png")} />
         <Label>Invest</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <Icon src={require("./assets/tab-profile.png")} />
+        <Label>Profile</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

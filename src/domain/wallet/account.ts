@@ -33,6 +33,15 @@ export function isLikelyStellarPublicKey(value: string): boolean {
 }
 
 /**
+ * Whether this account can send/sign transactions in the app today.
+ * Only custodial accounts (backed by a real signer, e.g. Cavos) qualify;
+ * `watch_only` accounts hold no keys, and `non_custodial` has no signer implementation yet.
+ */
+export function canSend(account: WalletAccount): boolean {
+  return account.custody === "custodial";
+}
+
+/**
  * Factory for watched addresses; `id` equals `publicKey` for watch-only accounts.
  */
 export function makeWatchOnlyAccount(

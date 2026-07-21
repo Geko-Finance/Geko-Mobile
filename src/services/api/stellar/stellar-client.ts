@@ -4,8 +4,7 @@
  * Use type-only imports, `@stellar/typescript-wallet-sdk` (self-contained browser
  * bundle), or locally declared protocol constants instead.
  */
-import type { Networks } from "@stellar/stellar-sdk";
-import { StellarConfiguration, Wallet } from "@stellar/typescript-wallet-sdk";
+import { Wallet } from "@stellar/typescript-wallet-sdk";
 
 import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
 
@@ -13,6 +12,7 @@ import { ApiError } from "../api-errors";
 import { mapHorizonBalances } from "./horizon-mapper";
 import {
   STELLAR_NETWORKS,
+  createStellarWallet,
   getActiveStellarNetwork,
   type StellarNetworkConfig,
 } from "./stellar-config";
@@ -28,15 +28,6 @@ const clientCache = new Map<StellarNetworkId, StellarClient>();
 
 const resolveNetworkConfig = (networkId?: StellarNetworkId): StellarNetworkConfig =>
   networkId === undefined ? getActiveStellarNetwork() : STELLAR_NETWORKS[networkId];
-
-const createWallet = (config: StellarNetworkConfig): Wallet => {
-  const stellarConfiguration = new StellarConfiguration({
-    network: config.networkPassphrase as Networks,
-    horizonUrl: config.horizonUrl,
-  });
-
-  return new Wallet({ stellarConfiguration });
-};
 
 const getHttpStatus = (error: unknown): number | undefined => {
   if (
@@ -83,7 +74,7 @@ const loadAccount = async (wallet: Wallet, publicKey: string) => {
 };
 
 const createStellarClient = (config: StellarNetworkConfig): StellarClient => {
-  const wallet = createWallet(config);
+  const wallet = createStellarWallet(config);
 
   return {
     network: config,

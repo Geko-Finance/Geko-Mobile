@@ -1,15 +1,12 @@
 import "@/src/services/crypto/crypto-polyfill";
 
-import type { Networks } from "@stellar/stellar-sdk";
-import { StellarConfiguration, Wallet } from "@stellar/typescript-wallet-sdk";
-
 import type { StellarNetworkId } from "@/src/domain/wallet";
 
 import { fundTestnetAccount } from "./friendbot";
 import {
   STELLAR_NETWORKS,
+  createStellarWallet,
   getActiveStellarNetwork,
-  type StellarNetworkConfig,
 } from "./stellar-config";
 
 /**
@@ -25,7 +22,7 @@ export async function createFundedTestAccount(
       ? getActiveStellarNetwork()
       : STELLAR_NETWORKS[networkId];
 
-  const wallet = createWallet(config);
+  const wallet = createStellarWallet(config);
   const publicKey = wallet.stellar().account().createKeypair().publicKey;
   // Secret key is intentionally discarded; the resulting account is watch-only.
 
@@ -33,12 +30,3 @@ export async function createFundedTestAccount(
 
   return { publicKey };
 }
-
-const createWallet = (config: StellarNetworkConfig): Wallet => {
-  const stellarConfiguration = new StellarConfiguration({
-    network: config.networkPassphrase as Networks,
-    horizonUrl: config.horizonUrl,
-  });
-
-  return new Wallet({ stellarConfiguration });
-};

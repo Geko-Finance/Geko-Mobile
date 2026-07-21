@@ -17,6 +17,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "preview-mainnet": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_STELLAR_NETWORK": "mainnet"
+      }
+    },
     "production": {
       "autoIncrement": true
     }

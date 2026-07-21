@@ -29,6 +29,14 @@ const toStellarNetwork = (value: unknown): StellarNetworkId => {
   return "testnet";
 };
 
+const resolveStellarNetwork = (): StellarNetworkId => {
+  if (process.env.EXPO_PUBLIC_STELLAR_NETWORK === "mainnet") {
+    return "mainnet";
+  }
+
+  return toStellarNetwork(extra.stellarNetwork);
+};
+
 export const appConfig: AppConfig = {
   apiBaseUrl:
     typeof extra.apiBaseUrl === "string"
@@ -37,5 +45,5 @@ export const appConfig: AppConfig = {
   environment: toEnvironment(extra.environment),
   requestTimeoutMs:
     typeof extra.requestTimeoutMs === "number" ? extra.requestTimeoutMs : 15000,
-  stellarNetwork: toStellarNetwork(extra.stellarNetwork),
+  stellarNetwork: resolveStellarNetwork(),
 };

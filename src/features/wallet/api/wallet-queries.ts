@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
 import type { Balance, StellarNetworkId, WalletAccount } from "@/src/domain/wallet";
@@ -9,6 +9,11 @@ import {
 import { signTestCustodialPayment } from "@/src/services/api/cavos/cavos-test-payment";
 import type { CavosIdentity } from "@/src/services/api/cavos/cavos-types";
 import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
+import { fundTestnetAccount } from "@/src/services/api/stellar/friendbot";
+import {
+  fetchAccountPayments,
+  type StellarTransactionEntry,
+} from "@/src/services/api/stellar/stellar-history";
 import {
   getStellarClient,
   isAccountNotFoundError,
@@ -23,6 +28,8 @@ export const walletKeys = {
   all: ["wallet"] as const,
   balances: (networkId: StellarNetworkId, publicKey: string) =>
     [...walletKeys.all, "balances", networkId, publicKey] as const,
+  transactions: (networkId: StellarNetworkId, publicKey: string) =>
+    [...walletKeys.all, "transactions", networkId, publicKey] as const,
 };
 
 /** Returns the active Stellar network id from app config so screens avoid importing config directly. */
@@ -43,6 +50,17 @@ export function useAccountBalances(publicKey: string | undefined) {
   });
 }
 
+/** Fetches recent Stellar payment history for an account public key on the active network. */
+export function useAccountTransactions(publicKey: string | undefined) {
+  const networkId = useActiveNetworkId();
+
+  return useQuery<StellarTransactionEntry[], Error>({
+    enabled: publicKey !== undefined,
+    queryFn: () => fetchAccountPayments(publicKey!, networkId),
+    queryKey: walletKeys.transactions(networkId, publicKey ?? "none"),
+  });
+}
+
 /**
  * Dev/testnet-only flow — generates a keypair, discards the secret (watch-only),
  * funds via Friendbot, and registers the account; fails with ApiError(400) on
@@ -58,6 +76,23 @@ export function useCreateTestWallet() {
         id: publicKey,
         name: input.name.trim() || "Test Wallet",
         publicKey,
+      });
+    },
+  });
+}
+
+export function useFundTestnetAccount() {
+  const queryClient = useQueryClient();
+  const networkId = useActiveNetworkId();
+
+  return useMutation({
+    mutationFn: async (publicKey: string) => fundTestnetAccount(publicKey),
+    onSuccess: (_data, publicKey) => {
+      queryClient.invalidateQueries({
+        queryKey: walletKeys.balances(networkId, publicKey),
+      });
+      queryClient.invalidateQueries({
+        queryKey: walletKeys.transactions(networkId, publicKey),
       });
     },
   });

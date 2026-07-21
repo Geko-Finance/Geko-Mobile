@@ -11,6 +11,7 @@ import {
 import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import {
   CARD_ASSETS,
@@ -103,6 +104,7 @@ const TRANSACTIONS = [
 ];
 
 export function HomeScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedPeriod, setSelectedPeriod] =
     useState<TransactionPeriod>("month");
@@ -195,7 +197,11 @@ export function HomeScreen() {
 
         <View className="mt-4 flex-row gap-2.5">
           <QuickAction icon={Send} label="Send" />
-          <QuickAction icon={ArrowDown} label="Receive" />
+          <QuickAction
+            icon={ArrowDown}
+            label="Receive"
+            onPress={() => router.push("/payments/receive")}
+          />
           <QuickAction icon={CircleDollarSign} label="Buy & Sell" />
         </View>
 

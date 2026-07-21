@@ -1,7 +1,9 @@
 import { decodeSep7Uri, encodeSep7PayRequest } from "./sep7";
 
-const DESTINATION = `G${"A".repeat(55)}`;
-const ISSUER = `G${"B".repeat(55)}`;
+// Real, checksum-valid Stellar public keys (Keypair.random() output) — the real
+// SEP-7 parser validates the StrKey checksum, not just the G.../56-char shape.
+const DESTINATION = "GAXWYIKC2N2Q43LZFVZWLL6VPEAYGW5AQHJYP3SUHPFPNMIGZJ2HNSEU";
+const ISSUER = "GDH4ZIWJFO2GSCOAQBLUFIRVRSBQUZN7IZOLGIV24QIPCRS5AUCILQOT";
 
 describe("encodeSep7PayRequest", () => {
   it("encodes a minimal pay request with just a destination", () => {

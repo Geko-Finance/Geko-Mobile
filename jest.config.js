@@ -1,11 +1,17 @@
+/**
+ * No `jest-expo` preset on purpose: its React Native test environment injects a
+ * WHATWG streams polyfill (`expo/virtual/streams.js`) that races with axios's own
+ * feature detection inside `@stellar/typescript-wallet-sdk`'s bundle, crashing
+ * non-deterministically as soon as a test imports the real SDK. Every test in this
+ * project is domain/service-level (no RN component rendering), so plain Node +
+ * the project's existing babel config (via babel-jest) is both sufficient and stable.
+ */
 module.exports = {
-  preset: "jest-expo",
   testEnvironment: "node",
-  moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/src/$1",
+  transform: {
+    "^.+\\.[jt]sx?$": "babel-jest",
   },
-  transformIgnorePatterns: [
-    "node_modules/(?!@stellar|@react-native|react-native|expo|@expo|@react-navigation)",
-  ],
-  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/$1",
+  },
 };

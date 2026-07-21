@@ -5,6 +5,7 @@ import {
   Keypair,
   Networks,
   Operation,
+  Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 
@@ -63,6 +64,28 @@ function signXdr(xdr: string, keypair: Keypair): string {
   const transaction = TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
   transaction.sign(keypair);
   return transaction.toXDR();
+}
+
+function buildFeeBumpXdr(
+  source: Keypair,
+  destinationPublicKey: string,
+  feeSource: Keypair
+): string {
+  const innerXdr = signXdr(
+    buildUnsignedPaymentXdr(source.publicKey(), destinationPublicKey),
+    source
+  );
+  const innerTransaction = TransactionBuilder.fromXDR(
+    innerXdr,
+    NETWORK_PASSPHRASE
+  ) as Transaction;
+  const feeBump = TransactionBuilder.buildFeeBumpTransaction(
+    feeSource,
+    "200",
+    innerTransaction,
+    NETWORK_PASSPHRASE
+  );
+  return feeBump.toXDR();
 }
 
 describe("thresholdCategoryForOperationType / requiredThresholdCategoryForOperations", () => {
@@ -316,5 +339,49 @@ describe("mergeSignatures", () => {
     );
 
     expect(mergedTransaction.signatures).toHaveLength(2);
+  });
+});
+
+describe("fee-bump rejection", () => {
+  it("evaluatePendingTx throws on a real fee-bump envelope instead of silently evaluating the inner transaction", () => {
+    const source = Keypair.random();
+    const cosigner = Keypair.random();
+    const feeSource = Keypair.random();
+    const config: MultisigAccountConfig = {
+      signers: [
+        { publicKey: source.publicKey(), weight: 1 },
+        { publicKey: cosigner.publicKey(), weight: 1 },
+      ],
+      thresholds: { low: 1, medium: 2, high: 2 },
+    };
+    const feeBumpXdr = buildFeeBumpXdr(
+      source,
+      cosigner.publicKey(),
+      feeSource
+    );
+
+    expect(() =>
+      evaluatePendingTx(feeBumpXdr, NETWORK_PASSPHRASE, config)
+    ).toThrow(/fee-bump/i);
+  });
+
+  it("mergeSignatures throws on a real fee-bump envelope", () => {
+    const source = Keypair.random();
+    const cosigner = Keypair.random();
+    const feeSource = Keypair.random();
+    const unsignedXdr = buildUnsignedPaymentXdr(
+      source.publicKey(),
+      cosigner.publicKey()
+    );
+    const signedXdr = signXdr(unsignedXdr, source);
+    const feeBumpXdr = buildFeeBumpXdr(
+      source,
+      cosigner.publicKey(),
+      feeSource
+    );
+
+    expect(() =>
+      mergeSignatures(signedXdr, feeBumpXdr, NETWORK_PASSPHRASE)
+    ).toThrow(/fee-bump/i);
   });
 });

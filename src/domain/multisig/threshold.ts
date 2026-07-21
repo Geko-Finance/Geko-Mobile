@@ -114,6 +114,17 @@ function decodeAsTransaction(
  * `PendingTx` — callers evaluating a not-yet-persisted candidate (see Task 6's
  * `useProposePayment`) shouldn't need to invent a placeholder `id`/`sourceAccountId` just to
  * call this.
+ *
+ * IMPORTANT — scope boundary: this only matches signature HINTS (the 4-byte, non-secret
+ * `DecoratedSignature.hint()`) against known signers' public keys; it does not cryptographically
+ * verify the signatures themselves. Final signature validity is always checked by Horizon at
+ * submission time — a transaction reported as `isSatisfied: true` here can still be rejected on
+ * submit if any attached signature is actually invalid (e.g. `tx_bad_auth`). This is a deliberate
+ * scope boundary, not an oversight: real verification would duplicate what the network already
+ * guarantees, at the cost of meaningful added complexity, and a bad signature can never move
+ * funds regardless of what this function reports — it can only cause a submit-time rejection
+ * where the UI locally believed the threshold was already met. Do not treat `isSatisfied` as
+ * proof of cryptographically valid signatures.
  */
 export function evaluatePendingTx(
   envelopeXdr: string,

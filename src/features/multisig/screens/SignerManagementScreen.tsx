@@ -89,21 +89,38 @@ export function SignerManagementScreen() {
       return;
     }
 
-    if (Number.isNaN(weight) || weight < 0) {
-      setValidationError("Weight must be a non-negative number.");
+    if (Number.isNaN(weight) || weight < 0 || weight > 255) {
+      setValidationError("Weight must be a number between 0 and 255.");
       return;
     }
 
+    // A `setOptions` signer operation with a key that's already a signer REPLACES that signer's
+    // weight on-chain rather than adding a second entry (this is also how removal works, via
+    // weight 0) — so the resulting config must replace any existing entry for `key`, not append
+    // to it. Appending would let a weight-reducing "edit" (the only way this screen supports
+    // reducing an existing signer's weight, since there's no dedicated edit UI) undercount the
+    // true resulting total weight and silently bypass the lockout check below.
     const resultingConfig: MultisigAccountConfig = {
       ...config,
-      signers: [...config.signers, { publicKey: key, weight }],
+      signers: [
+        ...config.signers.filter((signer) => signer.publicKey !== key),
+        { publicKey: key, weight },
+      ],
     };
 
     submitChange([{ kind: "add", publicKey: key, weight }], resultingConfig);
     setNewSignerKey("");
+    setNewSignerWeight("1");
   };
 
   const handleRemoveSigner = (publicKey: string) => {
+    // Defense-in-depth: the Remove button is already conditionally omitted for the master key in
+    // the JSX below, but that's UI-rendering-only — this guard ensures the master key can never
+    // be removed even if the row rendering changes later.
+    if (publicKey === account.publicKey) {
+      return;
+    }
+
     const resultingConfig: MultisigAccountConfig = {
       ...config,
       signers: config.signers.filter((signer) => signer.publicKey !== publicKey),

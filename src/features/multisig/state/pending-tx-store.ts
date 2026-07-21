@@ -55,7 +55,7 @@ export const usePendingTxStore = create<PendingTxState>()(
         })),
     }),
     {
-      name: "geko.wallet.pendingTransactions.v1",
+      name: "geko.multisig.pendingTransactions.v1",
       partialize: (state) => ({ pendingTxs: state.pendingTxs }),
       storage: createJSONStorage(() => asyncStateStorage),
       version: 1,

@@ -29,7 +29,14 @@ const clientCache = new Map<StellarNetworkId, StellarClient>();
 const resolveNetworkConfig = (networkId?: StellarNetworkId): StellarNetworkConfig =>
   networkId === undefined ? getActiveStellarNetwork() : STELLAR_NETWORKS[networkId];
 
-const getHttpStatus = (error: unknown): number | undefined => {
+/**
+ * Extracts an HTTP status code from an error shaped like an Axios error
+ * (`error.response.status`), which is how Horizon/wallet-sdk request failures surface
+ * regardless of which bundled copy of stellar-sdk threw them (see the `instanceof`
+ * caveat below) — exported so other Stellar-adjacent call sites (e.g. submit-transaction
+ * error handling) can reuse the same detection instead of re-implementing it.
+ */
+export const getHttpStatus = (error: unknown): number | undefined => {
   if (
     typeof error === "object" &&
     error !== null &&

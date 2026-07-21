@@ -134,6 +134,17 @@ export function AccountDetailScreen() {
           <Text className="text-[14px] font-bold text-white">Propose payment</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityLabel="View pending approvals"
+          accessibilityRole="button"
+          className="mt-3 self-start rounded-full bg-[#242426] px-4 py-2.5"
+          onPress={() =>
+            router.push({ pathname: "/multisig/pending", params: { accountId: account.id } })
+          }
+        >
+          <Text className="text-[14px] font-bold text-white">Pending approvals</Text>
+        </Pressable>
+
         <Text className="mb-3 mt-6 text-[15px] font-bold text-[#8E8E92]">
           Accounts
         </Text>

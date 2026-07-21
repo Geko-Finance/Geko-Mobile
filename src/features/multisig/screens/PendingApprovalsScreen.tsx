@@ -16,6 +16,16 @@ import {
   useSubmitPendingTx,
 } from "@/src/features/multisig/api/multisig-queries";
 
+function formatPublicKey(publicKey: string): string {
+  return `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
+}
+
+/** Clears one key from a `Record`-shaped piece of state, used to reset a per-row error before retrying that row's action. */
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _removed, ...rest } = record;
+  return rest;
+}
+
 export function PendingApprovalsScreen() {
   const { accountId } = useLocalSearchParams<{ accountId: string }>();
   const router = useRouter();
@@ -26,6 +36,15 @@ export function PendingApprovalsScreen() {
   const signPendingTx = useSignPendingTx();
   const submitPendingTx = useSubmitPendingTx();
   const [shareUriByTxId, setShareUriByTxId] = useState<Record<string, string>>({});
+
+  // Mutation state (isPending/isError/error) from `useMutation()` is global to the component,
+  // not per-row — with two pending txs, submitting one would otherwise make its error/spinner
+  // appear under every row. These track which specific pending tx is in flight or errored, the
+  // same per-id-keyed pattern already used for `shareUriByTxId` above.
+  const [signingTxId, setSigningTxId] = useState<string | null>(null);
+  const [submittingTxId, setSubmittingTxId] = useState<string | null>(null);
+  const [signErrorByTxId, setSignErrorByTxId] = useState<Record<string, string>>({});
+  const [submitErrorByTxId, setSubmitErrorByTxId] = useState<Record<string, string>>({});
 
   if (account === undefined || config === undefined) {
     return (
@@ -38,7 +57,19 @@ export function PendingApprovalsScreen() {
   }
 
   const handleSign = async (pendingTx: PendingTx) => {
-    await signPendingTx.mutateAsync({ pendingTx, account });
+    setSigningTxId(pendingTx.id);
+    setSignErrorByTxId((current) => withoutKey(current, pendingTx.id));
+
+    try {
+      await signPendingTx.mutateAsync({ pendingTx, account });
+    } catch (error) {
+      setSignErrorByTxId((current) => ({
+        ...current,
+        [pendingTx.id]: error instanceof Error ? error.message : "Failed to sign transaction.",
+      }));
+    } finally {
+      setSigningTxId((current) => (current === pendingTx.id ? null : current));
+    }
   };
 
   const handleShare = (pendingTx: PendingTx) => {
@@ -53,8 +84,20 @@ export function PendingApprovalsScreen() {
   };
 
   const handleSubmit = async (pendingTx: PendingTx) => {
-    await submitPendingTx.mutateAsync(pendingTx);
-    router.replace("/payments/success");
+    setSubmittingTxId(pendingTx.id);
+    setSubmitErrorByTxId((current) => withoutKey(current, pendingTx.id));
+
+    try {
+      await submitPendingTx.mutateAsync(pendingTx);
+      router.replace("/payments/success");
+    } catch (error) {
+      setSubmitErrorByTxId((current) => ({
+        ...current,
+        [pendingTx.id]: error instanceof Error ? error.message : "Failed to submit transaction.",
+      }));
+    } finally {
+      setSubmittingTxId((current) => (current === pendingTx.id ? null : current));
+    }
   };
 
   return (
@@ -86,6 +129,11 @@ export function PendingApprovalsScreen() {
           );
           const hasSigned = evaluation.signedBy.includes(account.publicKey);
           const shareUri = shareUriByTxId[pendingTx.id];
+          const isSigning = signingTxId === pendingTx.id;
+          const isSubmitting = submittingTxId === pendingTx.id;
+          const signError = signErrorByTxId[pendingTx.id];
+          const submitError = submitErrorByTxId[pendingTx.id];
+          const txLabel = pendingTx.id.slice(0, 8);
 
           return (
             <View
@@ -96,21 +144,24 @@ export function PendingApprovalsScreen() {
                 {evaluation.collectedWeight} / {evaluation.requiredWeight} weight collected
               </Text>
               <Text className="mt-1 text-[13px] font-semibold text-[#8E8E92]">
-                Signed by: {evaluation.signedBy.length === 0 ? "no one yet" : evaluation.signedBy.join(", ")}
+                Signed by:{" "}
+                {evaluation.signedBy.length === 0
+                  ? "no one yet"
+                  : evaluation.signedBy.map(formatPublicKey).join(", ")}
               </Text>
 
               <View className="mt-4 flex-row flex-wrap gap-2">
                 {!hasSigned ? (
                   <Pressable
-                    accessibilityLabel="Sign"
+                    accessibilityLabel={`Sign transaction ${txLabel}`}
                     accessibilityRole="button"
                     className="rounded-full bg-[#242426] px-4 py-2.5"
-                    disabled={signPendingTx.isPending}
+                    disabled={isSigning}
                     onPress={() => {
                       void handleSign(pendingTx);
                     }}
                   >
-                    {signPendingTx.isPending ? (
+                    {isSigning ? (
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <Text className="text-[14px] font-bold text-white">Sign</Text>
@@ -119,7 +170,7 @@ export function PendingApprovalsScreen() {
                 ) : null}
 
                 <Pressable
-                  accessibilityLabel="Share"
+                  accessibilityLabel={`Share transaction ${txLabel}`}
                   accessibilityRole="button"
                   className="rounded-full bg-[#242426] px-4 py-2.5"
                   onPress={() => handleShare(pendingTx)}
@@ -128,10 +179,10 @@ export function PendingApprovalsScreen() {
                 </Pressable>
 
                 <Pressable
-                  accessibilityLabel="Submit"
+                  accessibilityLabel={`Submit transaction ${txLabel}`}
                   accessibilityRole="button"
                   className="rounded-full bg-[#5BED97] px-4 py-2.5"
-                  disabled={!evaluation.isSatisfied || submitPendingTx.isPending}
+                  disabled={!evaluation.isSatisfied || isSubmitting}
                   onPress={() => {
                     void handleSubmit(pendingTx);
                   }}
@@ -148,9 +199,15 @@ export function PendingApprovalsScreen() {
                 </View>
               ) : null}
 
-              {submitPendingTx.isError ? (
+              {signError !== undefined ? (
                 <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
-                  {submitPendingTx.error.message}
+                  {signError}
+                </Text>
+              ) : null}
+
+              {submitError !== undefined ? (
+                <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
+                  {submitError}
                 </Text>
               ) : null}
             </View>

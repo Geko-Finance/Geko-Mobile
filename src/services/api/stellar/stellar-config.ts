@@ -1,3 +1,6 @@
+import type { Networks } from "@stellar/stellar-sdk";
+import { StellarConfiguration, Wallet } from "@stellar/typescript-wallet-sdk";
+
 import { appConfig } from "@/src/config/env";
 import type { StellarNetworkId } from "@/src/domain/wallet";
 
@@ -43,4 +46,29 @@ export const STELLAR_NETWORKS: Record<StellarNetworkId, StellarNetworkConfig> = 
 /** Returns the Stellar network configuration for the current app build. */
 export function getActiveStellarNetwork(): StellarNetworkConfig {
   return STELLAR_NETWORKS[appConfig.stellarNetwork];
+}
+
+/** Builds a `Wallet` instance scoped to the given network config; construction is local-only (no network call). */
+export function createStellarWallet(config: StellarNetworkConfig): Wallet {
+  return new Wallet({
+    stellarConfiguration: new StellarConfiguration({
+      network: config.networkPassphrase as Networks,
+      horizonUrl: config.horizonUrl,
+    }),
+  });
+}
+
+/** Resolves a `StellarNetworkConfig` by matching a raw network passphrase string. */
+export function getStellarNetworkConfigByPassphrase(
+  networkPassphrase: string
+): StellarNetworkConfig {
+  const match = Object.values(STELLAR_NETWORKS).find(
+    (network) => network.networkPassphrase === networkPassphrase
+  );
+
+  if (match === undefined) {
+    throw new Error(`Unrecognized Stellar network passphrase`);
+  }
+
+  return match;
 }

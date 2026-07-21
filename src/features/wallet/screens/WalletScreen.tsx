@@ -17,6 +17,7 @@ import {
   makeWatchOnlyAccount,
 } from "@/src/domain/wallet";
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
+import { BackButton } from "@/src/features/shared/components/BackButton";
 import {
   useActiveNetworkId,
   useCreateTestWallet,
@@ -107,6 +108,9 @@ export function WalletScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-2">
+          <BackButton />
+        </View>
         <Text className="text-[13px] font-bold uppercase tracking-wide text-[#8E8E92]">
           WALLET
         </Text>

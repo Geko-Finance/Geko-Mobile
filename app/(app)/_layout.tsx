@@ -19,7 +19,11 @@ export default function AppLayout() {
       <Stack.Screen name="wallet/index" />
       <Stack.Screen name="wallet/[accountId]" />
       <Stack.Screen name="onboarding/custodial" />
+      <Stack.Screen name="payments/send-options" />
       <Stack.Screen name="payments/send" />
+      <Stack.Screen name="payments/receive" />
+      <Stack.Screen name="payments/scan" />
+      <Stack.Screen name="payments/add-asset" />
       <Stack.Screen name="payments/confirm" />
       <Stack.Screen name="payments/success" />
       <Stack.Screen name="kyc/index" />

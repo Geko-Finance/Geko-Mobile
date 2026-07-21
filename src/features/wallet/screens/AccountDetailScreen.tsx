@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { isNativeAsset } from "@/src/domain/wallet";
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
+import { BackButton } from "@/src/features/shared/components/BackButton";
 import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
 import { Skeleton } from "@/src/features/shared/components/ui/skeleton";
 import {
@@ -105,6 +106,9 @@ export function AccountDetailScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 16 }}
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-2">
+          <BackButton />
+        </View>
         <Text className="text-[13px] font-bold uppercase tracking-wide text-[#8E8E92]">
           Wallet
         </Text>

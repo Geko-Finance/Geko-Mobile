@@ -45,7 +45,13 @@
       "expo-font",
       "expo-localization",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Geko needs camera access to scan wallet addresses."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

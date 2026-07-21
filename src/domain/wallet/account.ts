@@ -1,7 +1,18 @@
 /**
- * Wallet custody model.
- * `watch_only` — the app tracks the address but holds no keys at all (pasted/watched addresses
- * and Friendbot-funded dev accounts); such accounts can never sign.
+ * Wallet custody model. There are two ways this app can give a user a real,
+ * signing-capable wallet:
+ *   - `custodial` — keys held by a third-party signer (Cavos). This is the ONLY
+ *     one implemented today: see src/services/api/cavos/* and
+ *     src/features/onboarding/screens/CustodialOnboardingScreen.tsx.
+ *   - `non_custodial` — keys held on-device (e.g. in SecureStore), signed locally
+ *     with no third party in the loop. This value is reserved in the type but has
+ *     NO factory and NO WalletSigner implementation yet — do not assume it works;
+ *     `canSend()` below already excludes it. Build it as its own epic (device
+ *     keypair generation/storage, a local-signing WalletSigner adapter) rather
+ *     than assuming it can reuse the Cavos plumbing.
+ *   - `watch_only` — the app tracks the address but holds no keys at all
+ *     (pasted/watched addresses and Friendbot-funded dev accounts); such accounts
+ *     can never sign.
  */
 export type WalletCustody = "custodial" | "non_custodial" | "watch_only";
 

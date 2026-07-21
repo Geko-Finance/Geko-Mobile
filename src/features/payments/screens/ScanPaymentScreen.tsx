@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { decodeSep7Uri } from "@/src/domain/payments";
@@ -11,13 +11,15 @@ export function ScanPaymentScreen() {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanError, setScanError] = useState<string | null>(null);
-  const [hasScanned, setHasScanned] = useState(false);
+  const hasScannedRef = useRef(false);
 
   if (!permission) {
     return <View className="flex-1 bg-black" />;
   }
 
   if (!permission.granted) {
+    const canAskAgain = permission.canAskAgain;
+
     return (
       <View
         className="flex-1 items-center justify-center bg-black px-6"
@@ -27,18 +29,26 @@ export function ScanPaymentScreen() {
           Camera access needed
         </Text>
         <Text className="mt-3 text-center text-[15px] font-semibold text-[#8E8E92]">
-          Geko needs camera access to scan a payment QR code.
+          {canAskAgain
+            ? "Geko needs camera access to scan a payment QR code."
+            : "Camera access was denied. Enable it for Geko in your device Settings to scan a payment QR code."}
         </Text>
         <Pressable
-          accessibilityLabel="Grant camera access"
+          accessibilityLabel={
+            canAskAgain ? "Grant camera access" : "Open Settings"
+          }
           accessibilityRole="button"
           className="mt-6 rounded-full bg-[#242426] px-5 py-3"
           onPress={() => {
-            void requestPermission();
+            if (canAskAgain) {
+              void requestPermission();
+            } else {
+              void Linking.openSettings();
+            }
           }}
         >
           <Text className="text-[14px] font-bold text-white">
-            Grant camera access
+            {canAskAgain ? "Grant camera access" : "Open Settings"}
           </Text>
         </Pressable>
       </View>
@@ -46,7 +56,7 @@ export function ScanPaymentScreen() {
   }
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (hasScanned) {
+    if (hasScannedRef.current) {
       return;
     }
 
@@ -58,7 +68,7 @@ export function ScanPaymentScreen() {
         return;
       }
 
-      setHasScanned(true);
+      hasScannedRef.current = true;
       router.push({
         pathname: "/payments/confirm",
         params: {

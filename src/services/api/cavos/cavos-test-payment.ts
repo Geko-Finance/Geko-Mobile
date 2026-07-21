@@ -1,12 +1,5 @@
-import {
-  Account,
-  Asset,
-  BASE_FEE,
-  Operation,
-  TransactionBuilder,
-} from "@stellar/stellar-base";
-
 import type { WalletAccount } from "@/src/domain/wallet";
+import { buildNativePaymentXdr } from "@/src/services/api/stellar/payment-xdr";
 import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
 
 import { CavosSigner } from "./cavos-signer";
@@ -25,24 +18,15 @@ export async function signTestCustodialPayment(
   }
 
   const { networkPassphrase } = getActiveStellarNetwork();
-  // Sequence "0" is safe here only because mock CavosClient.execute() never submits to Horizon;
-  // a real integration must fetch the account's current sequence number first.
-  const account_ = new Account(account.publicKey, "0");
-
-  const unsignedXdr = new TransactionBuilder(account_, {
-    fee: BASE_FEE,
+  // Sequence "0" is safe here only because Cavos execute() ignores the passed sequence
+  // and builds its own tx internally from amount+destination.
+  const unsignedXdr = buildNativePaymentXdr({
+    sourcePublicKey: account.publicKey,
+    sourceSequence: "0",
+    destinationPublicKey: account.publicKey,
+    amountXlm: "1",
     networkPassphrase,
-  })
-    .addOperation(
-      Operation.payment({
-        destination: account.publicKey,
-        asset: Asset.native(),
-        amount: "1",
-      }),
-    )
-    .setTimeout(30)
-    .build()
-    .toXDR();
+  });
 
   const signer = new CavosSigner(session);
   await signer.signTransaction(unsignedXdr, { networkPassphrase });

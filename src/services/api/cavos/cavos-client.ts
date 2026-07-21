@@ -1,3 +1,9 @@
+import { appConfig } from "@/src/config/env";
+
+import {
+  CavosProviderUnavailableError,
+  CavosSessionExpiredError,
+} from "./cavos-errors";
 import type {
   CavosExecuteResult,
   CavosIdentity,
@@ -6,7 +12,8 @@ import type {
 
 /**
  * Internal Cavos wallet-as-a-service port scoped to this MVP.
- * Not the real `@cavos/kit` types — swapping in the SDK later should only touch this file.
+ * The real `@cavos/kit` SDK runs server-side in server/; this file is an HTTP
+ * client to that service, keeping the same port interface for callers.
  */
 export interface CavosClient {
   connect(identity: CavosIdentity): Promise<CavosSession>;
@@ -15,66 +22,44 @@ export interface CavosClient {
     amountStroops: bigint,
     destinationPublicKey: string
   ): Promise<CavosExecuteResult>;
+  signXdr(
+    session: CavosSession,
+    unsignedXdr: string
+  ): Promise<{ signedXdr: string }>;
+  addTrustline(
+    session: CavosSession,
+    code: string,
+    issuer: string
+  ): Promise<{ hash: string }>;
   getBalance(session: CavosSession): Promise<bigint>;
 }
 
-const STELLAR_BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-const MOCK_BALANCE_STROOPS = 10_000_000_000n;
+const cavosApiUrl = (path: string): string =>
+  `${appConfig.cavosBackendUrl}${path}`;
 
-const identitySeed = (identity: CavosIdentity): string =>
-  `${identity.userId}\0${identity.email ?? ""}`;
-
-const digestSeed = (seed: string, length: number): Uint8Array => {
-  const out = new Uint8Array(length);
-  let h1 = 2_166_136_261;
-  let h2 = 1_677_761_9;
-
-  for (let i = 0; i < seed.length; i += 1) {
-    const code = seed.charCodeAt(i);
-    h1 = Math.imul(h1 ^ code, 1_677_761_9);
-    h2 = Math.imul(h2 ^ code, 2_246_822_519);
-  }
-
-  for (let i = 0; i < length; i += 1) {
-    h1 = Math.imul(h1 ^ (h2 + i), 1_677_761_9);
-    h2 = Math.imul(h2 ^ (h1 + i), 2_246_822_519);
-    out[i] = (h1 ^ h2) & 0xff;
-  }
-
-  return out;
-};
-
-const toHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-/** Deterministic G...-shaped testnet address; stable for the same identity across calls. */
-const deriveMockStellarAddress = (identity: CavosIdentity): string => {
-  const bytes = digestSeed(identitySeed(identity), 55);
-  let address = "G";
-
-  for (let i = 0; i < 55; i += 1) {
-    address += STELLAR_BASE32_ALPHABET[bytes[i]! % 32]!;
-  }
-
-  return address;
-};
-
-const syntheticTxHash = (
-  session: CavosSession,
-  amountStroops: bigint,
-  destinationPublicKey: string
-): string => {
-  const seed = `${session.userId}\0${session.address}\0${amountStroops}\0${destinationPublicKey}`;
-  return toHex(digestSeed(seed, 32));
-};
-
-const createMockCavosClient = (): CavosClient => ({
+const createRealCavosClient = (): CavosClient => ({
   async connect(identity: CavosIdentity): Promise<CavosSession> {
-    return {
-      address: deriveMockStellarAddress(identity),
-      status: "ready",
-      userId: identity.userId,
+    const response = await fetch(cavosApiUrl("/api/cavos/connect"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: identity.userId,
+        email: identity.email,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos connect failed (${response.status})`
+      );
+    }
+
+    const { address, status } = (await response.json()) as {
+      address: string;
+      status: CavosSession["status"];
     };
+
+    return { address, status, userId: identity.userId };
   },
 
   async execute(
@@ -82,22 +67,122 @@ const createMockCavosClient = (): CavosClient => ({
     amountStroops: bigint,
     destinationPublicKey: string
   ): Promise<CavosExecuteResult> {
-    return {
-      hash: syntheticTxHash(session, amountStroops, destinationPublicKey),
-    };
+    const response = await fetch(cavosApiUrl("/api/cavos/execute"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: session.userId,
+        amountStroops: amountStroops.toString(),
+        destination: destinationPublicKey,
+      }),
+    });
+
+    if (response.status === 409) {
+      throw new CavosSessionExpiredError(
+        "Cavos session is no longer valid; reconnect to continue"
+      );
+    }
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos execute failed (${response.status})`
+      );
+    }
+
+    const { hash } = (await response.json()) as { hash: string };
+    return { hash };
   },
 
-  async getBalance(_session: CavosSession): Promise<bigint> {
-    return MOCK_BALANCE_STROOPS;
+  async signXdr(
+    session: CavosSession,
+    unsignedXdr: string
+  ): Promise<{ signedXdr: string }> {
+    const response = await fetch(cavosApiUrl("/api/cavos/sign"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: session.userId,
+        unsignedXdr,
+      }),
+    });
+
+    if (response.status === 409) {
+      throw new CavosSessionExpiredError(
+        "Cavos session is no longer valid; reconnect to continue"
+      );
+    }
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos sign failed (${response.status})`
+      );
+    }
+
+    const { signedXdr } = (await response.json()) as { signedXdr: string };
+    return { signedXdr };
+  },
+
+  async addTrustline(
+    session: CavosSession,
+    code: string,
+    issuer: string
+  ): Promise<{ hash: string }> {
+    const response = await fetch(cavosApiUrl("/api/cavos/trustline"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: session.userId,
+        code,
+        issuer,
+      }),
+    });
+
+    if (response.status === 409) {
+      throw new CavosSessionExpiredError(
+        "Cavos session is no longer valid; reconnect to continue"
+      );
+    }
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos trustline failed (${response.status})`
+      );
+    }
+
+    const { hash } = (await response.json()) as { hash: string };
+    return { hash };
+  },
+
+  async getBalance(session: CavosSession): Promise<bigint> {
+    const response = await fetch(
+      cavosApiUrl(
+        `/api/cavos/balance?userId=${encodeURIComponent(session.userId)}`
+      )
+    );
+
+    if (response.status === 409) {
+      throw new CavosSessionExpiredError(
+        "Cavos session is no longer valid; reconnect to continue"
+      );
+    }
+
+    if (!response.ok) {
+      throw new CavosProviderUnavailableError(
+        `Cavos balance failed (${response.status})`
+      );
+    }
+
+    const { stroops } = (await response.json()) as { stroops: string };
+    return BigInt(stroops);
   },
 });
 
 let cavosClient: CavosClient | undefined;
 
-/** Returns the singleton mock Cavos client until `@cavos/kit` is wired in. */
+/** Returns the singleton Cavos client backed by the local Cavos backend service (server/) over HTTP. */
 export function getCavosClient(): CavosClient {
   if (cavosClient === undefined) {
-    cavosClient = createMockCavosClient();
+    cavosClient = createRealCavosClient();
   }
 
   return cavosClient;

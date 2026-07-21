@@ -7,6 +7,7 @@ import {
 
 import type {
   SignTransactionOptions,
+  SignTransactionResult,
   WalletSigner,
 } from "@/src/domain/wallet";
 
@@ -131,7 +132,7 @@ export class CavosSigner implements WalletSigner {
   async signTransaction(
     transactionXdr: string,
     options: SignTransactionOptions,
-  ): Promise<string> {
+  ): Promise<SignTransactionResult> {
     assertSessionReady(this.session);
 
     const { amountStroops, destination } = parseNativePayment(
@@ -139,12 +140,13 @@ export class CavosSigner implements WalletSigner {
       options.networkPassphrase,
     );
 
+    let result;
     try {
-      await this.client.execute(this.session, amountStroops, destination);
+      result = await this.client.execute(this.session, amountStroops, destination);
     } catch {
       throw new CavosProviderUnavailableError("Cavos provider is unavailable");
     }
 
-    return transactionXdr;
+    return { xdr: transactionXdr, hash: result.hash };
   }
 }

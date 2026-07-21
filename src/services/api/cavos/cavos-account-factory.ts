@@ -1,4 +1,5 @@
 import type { WalletAccount } from "@/src/domain/wallet";
+import { fundTestnetAccount } from "@/src/services/api/stellar/friendbot";
 
 import { getCavosClient } from "./cavos-client";
 import { setStoredCavosSession } from "./cavos-session-storage";
@@ -14,6 +15,13 @@ export async function createCustodialAccount(
 ): Promise<WalletAccount> {
   const session = await getCavosClient().connect(identity);
   await setStoredCavosSession(session);
+
+  // Cavos sponsors on-chain account creation but leaves 0 XLM spendable; Friendbot tops up testnet wallets for testing.
+  try {
+    await fundTestnetAccount(session.address);
+  } catch {
+    // Best-effort only — unavailable on mainnet or transient failures must not block wallet creation.
+  }
 
   return {
     createdAt: new Date().toISOString(),

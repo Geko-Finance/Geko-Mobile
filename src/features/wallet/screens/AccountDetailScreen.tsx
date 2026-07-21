@@ -123,6 +123,17 @@ export function AccountDetailScreen() {
           <Text className="text-[14px] font-bold text-white">Manage signers</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityLabel="Propose a multisig payment"
+          accessibilityRole="button"
+          className="mt-3 self-start rounded-full bg-[#242426] px-4 py-2.5"
+          onPress={() =>
+            router.push({ pathname: "/multisig/propose", params: { accountId: account.id } })
+          }
+        >
+          <Text className="text-[14px] font-bold text-white">Propose payment</Text>
+        </Pressable>
+
         <Text className="mb-3 mt-6 text-[15px] font-bold text-[#8E8E92]">
           Accounts
         </Text>

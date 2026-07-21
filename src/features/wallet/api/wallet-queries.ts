@@ -2,11 +2,15 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
 import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
-import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
+import {
+  createFundedTestAccount,
+  createNonCustodialAccount,
+} from "@/src/services/api/stellar/account-factory";
 import {
   getStellarClient,
   isAccountNotFoundError,
 } from "@/src/services/api/stellar/stellar-client";
+import { persistSigningSecret } from "@/src/services/wallet/local-signer";
 
 import { useWalletStore } from "../state/wallet-store";
 
@@ -51,6 +55,27 @@ export function useCreateTestWallet() {
         custody: "watch_only",
         id: publicKey,
         name: input.name.trim() || "Test Wallet",
+        publicKey,
+      });
+    },
+  });
+}
+
+/**
+ * Generates a real non-custodial keypair, persists its secret in SecureStore, and registers the
+ * account as `custody: "non_custodial"`. Works on both testnet and mainnet (no Friendbot call);
+ * the account must be funded separately before it can transact.
+ */
+export function useCreateNonCustodialWallet() {
+  return useMutation({
+    mutationFn: async (_input: { name: string }) => createNonCustodialAccount(),
+    onSuccess: async ({ publicKey, secretKey }, input) => {
+      await persistSigningSecret(publicKey, secretKey);
+      useWalletStore.getState().addAccount({
+        createdAt: new Date().toISOString(),
+        custody: "non_custodial",
+        id: publicKey,
+        name: input.name.trim() || "Self-custody wallet",
         publicKey,
       });
     },

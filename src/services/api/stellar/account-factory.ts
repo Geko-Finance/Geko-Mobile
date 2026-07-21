@@ -30,3 +30,23 @@ export async function createFundedTestAccount(
 
   return { publicKey };
 }
+
+/**
+ * Generates a real keypair for a self-custody account and returns both keys. The caller is
+ * responsible for persisting `secretKey` via SecureStore and never logging it. Unlike
+ * `createFundedTestAccount`, this does not fund the account — Friendbot only exists on testnet,
+ * and on mainnet funding is a real XLM transfer a human must perform.
+ */
+export async function createNonCustodialAccount(): Promise<{
+  publicKey: string;
+  secretKey: string;
+}> {
+  const config = getActiveStellarNetwork();
+  const wallet = createStellarWallet(config);
+  const signingKeypair = wallet.stellar().account().createKeypair();
+
+  return {
+    publicKey: signingKeypair.publicKey,
+    secretKey: signingKeypair.secretKey,
+  };
+}

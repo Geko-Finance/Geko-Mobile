@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { BackButton } from "@/src/features/shared/components/BackButton";
 import {
   useCreateCustodialWallet,
   useRecoverCustodialWallet,
@@ -57,14 +58,14 @@ export function CustodialOnboardingScreen() {
     if (mode === "create") {
       createCustodialWallet.mutate(
         { identity, name },
-        { onSuccess: () => router.replace("/wallet") }
+        { onSuccess: () => router.replace("/home") }
       );
       return;
     }
 
     recoverCustodialWallet.mutate(
       { identity },
-      { onSuccess: () => router.replace("/wallet") }
+      { onSuccess: () => router.replace("/home") }
     );
   };
 
@@ -76,6 +77,9 @@ export function CustodialOnboardingScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-2">
+          <BackButton />
+        </View>
         <Text className="text-[13px] font-bold uppercase tracking-wide text-[#8E8E92]">
           ONBOARDING
         </Text>

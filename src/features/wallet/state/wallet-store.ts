@@ -1,11 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { appConfig } from "@/src/config/env";
 import type { WalletAccount } from "@/src/domain/wallet";
 import { asyncStateStorage } from "@/src/services/storage/async-json-storage";
-
-import { DEV_SEED_ACCOUNTS } from "./wallet-seed";
 
 interface WalletState {
   accounts: WalletAccount[];
@@ -28,21 +25,14 @@ const resolveActiveAccountId = (
   return accounts[0]?.id ?? null;
 };
 
-const initialAccounts =
-  appConfig.environment === "development" ? DEV_SEED_ACCOUNTS : [];
+const initialAccounts: WalletAccount[] = [];
 
-const initialActiveAccountId =
-  appConfig.environment === "development"
-    ? (DEV_SEED_ACCOUNTS[0]?.id ?? null)
-    : null;
+const initialActiveAccountId = null;
 
 /**
  * Wallet account metadata state for the foundation epic.
  * Persists account metadata (names, public keys, custody kind — never secrets) via AsyncStorage;
- * dev seeds populate the initial state and are written on first launch; after that, rehydrated
- * state wins, so removed seeds stay removed. Hydration is asynchronous — on later launches the
- * seeds may flash briefly before rehydration replaces them, which is acceptable for the
- * mock-first phase. SecureStore stays reserved for secrets per CLAUDE.md.
+ * SecureStore stays reserved for secrets per CLAUDE.md.
  */
 export const useWalletStore = create<WalletState>()(
   persist(

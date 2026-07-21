@@ -10,7 +10,7 @@ export default function AppLayout() {
   }
 
   if (status === "anonymous") {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
   return (

@@ -7,23 +7,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import { useLoginMutation } from "@/src/features/auth/api/auth-queries";
-import { useSession } from "@/src/features/auth/session/SessionProvider";
-
 export function WelcomeScreen() {
   const router = useRouter();
-  const { signIn } = useSession();
-  const loginMutation = useLoginMutation();
-
-  const openDashboard = async () => {
-    const session = await loginMutation.mutateAsync({
-      email: "demo@geko.app",
-      password: "demo",
-    });
-
-    await signIn(session);
-    router.replace("/home");
-  };
 
   return (
     <ImageBackground
@@ -57,7 +42,7 @@ export function WelcomeScreen() {
             <Pressable
               accessibilityRole="button"
               className="h-12 items-center justify-center rounded-[11px] bg-[#237BFF]"
-              onPress={openDashboard}
+              onPress={() => router.push("/login")}
             >
               <Text className="text-sm font-bold text-white">Login</Text>
             </Pressable>
@@ -65,7 +50,7 @@ export function WelcomeScreen() {
             <Pressable
               accessibilityRole="button"
               className="h-10 items-center justify-center"
-              onPress={openDashboard}
+              onPress={() => router.push("/signup")}
             >
               <Text className="text-sm font-bold text-slate-50">Signup</Text>
             </Pressable>

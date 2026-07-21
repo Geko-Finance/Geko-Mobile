@@ -1,9 +1,47 @@
-import { decodeSep7Uri, encodeSep7PayRequest } from "./sep7";
+import {
+  Account,
+  Asset,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
+
+import { decodeSep7Uri, encodeSep7PayRequest, encodeSep7TxRequest } from "./sep7";
 
 // Real, checksum-valid Stellar public keys (Keypair.random() output) — the real
 // SEP-7 parser validates the StrKey checksum, not just the G.../56-char shape.
 const DESTINATION = "GAXWYIKC2N2Q43LZFVZWLL6VPEAYGW5AQHJYP3SUHPFPNMIGZJ2HNSEU";
 const ISSUER = "GDH4ZIWJFO2GSCOAQBLUFIRVRSBQUZN7IZOLGIV24QIPCRS5AUCILQOT";
+
+/**
+ * Builds a real, unsigned transaction envelope XDR (not a hand-crafted string) — the
+ * wallet-sdk's `isValidSep7Uri`/`parseSep7Uri` actually construct a `Transaction(xdr,
+ * networkPassphrase)` to validate a 'tx' URI, so a fixture must be a genuinely valid
+ * envelope on the given network or decode will reject it as "not a valid transaction
+ * envelope". This is a test-only import of `@stellar/stellar-sdk` (fine under Jest/Node;
+ * the runtime-import ban is about the Metro/Expo app bundle, not tests — see the existing
+ * precedent in `src/services/wallet/local-signer.test.ts`).
+ */
+function buildTestXdr(): string {
+  const sourcePublicKey = Keypair.random().publicKey();
+  const account = new Account(sourcePublicKey, "0");
+  const transaction = new TransactionBuilder(account, {
+    fee: "100",
+    networkPassphrase: Networks.TESTNET,
+  })
+    .addOperation(
+      Operation.payment({
+        destination: sourcePublicKey,
+        asset: Asset.native(),
+        amount: "1",
+      })
+    )
+    .setTimeout(30)
+    .build();
+
+  return transaction.toXDR();
+}
 
 describe("encodeSep7PayRequest", () => {
   it("encodes a minimal pay request with just a destination", () => {
@@ -113,5 +151,44 @@ describe("decodeSep7Uri", () => {
       destination: DESTINATION,
       memo: "invoice-42",
     });
+  });
+});
+
+describe("encodeSep7TxRequest", () => {
+  const XDR = buildTestXdr();
+  const NETWORK_PASSPHRASE: string = Networks.TESTNET;
+
+  it("encodes an xdr and networkPassphrase into a web+stellar:tx uri", () => {
+    const uri = encodeSep7TxRequest({
+      kind: "tx",
+      xdr: XDR,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    });
+
+    expect(uri.startsWith("web+stellar:tx?")).toBe(true);
+    expect(decodeURIComponent(uri)).toContain(`xdr=${XDR}`);
+  });
+
+  it("includes pubkey when given", () => {
+    const destination = "GAXWYIKC2N2Q43LZFVZWLL6VPEAYGW5AQHJYP3SUHPFPNMIGZJ2HNSEU";
+    const uri = encodeSep7TxRequest({
+      kind: "tx",
+      xdr: XDR,
+      networkPassphrase: NETWORK_PASSPHRASE,
+      pubkey: destination,
+    });
+
+    expect(uri).toContain(`pubkey=${destination}`);
+  });
+
+  it("round-trips through decodeSep7Uri", () => {
+    const request = {
+      kind: "tx" as const,
+      xdr: XDR,
+      networkPassphrase: NETWORK_PASSPHRASE,
+      pubkey: "GAXWYIKC2N2Q43LZFVZWLL6VPEAYGW5AQHJYP3SUHPFPNMIGZJ2HNSEU",
+    };
+
+    expect(decodeSep7Uri(encodeSep7TxRequest(request))).toEqual(request);
   });
 });

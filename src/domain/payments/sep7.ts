@@ -4,9 +4,10 @@ import {
   isValidSep7Uri,
   parseSep7Uri,
 } from "@stellar/typescript-wallet-sdk";
+import type { Networks } from "@stellar/stellar-sdk";
 
 import { isLikelyStellarPublicKey } from "../wallet";
-import type { Sep7PayRequest, Sep7Request } from "./types";
+import type { Sep7PayRequest, Sep7Request, Sep7TxRequest } from "./types";
 
 function assertValidDestination(destination: string): void {
   if (!isLikelyStellarPublicKey(destination)) {
@@ -73,6 +74,17 @@ export function encodeSep7PayRequest(request: Sep7PayRequest): string {
   return sep7Pay.toString();
 }
 
+/** Encodes a request to sign a specific transaction envelope as a `web+stellar:tx` SEP-7 URI. */
+export function encodeSep7TxRequest(request: Sep7TxRequest): string {
+  const sep7Tx = new Sep7Tx();
+  sep7Tx.xdr = request.xdr;
+  sep7Tx.networkPassphrase = request.networkPassphrase as Networks;
+  sep7Tx.pubkey = request.pubkey;
+  sep7Tx.msg = request.message;
+
+  return sep7Tx.toString();
+}
+
 /** Decodes any SEP-7 URI (`web+stellar:pay` or `web+stellar:tx`) into a plain domain request. */
 export function decodeSep7Uri(uri: string): Sep7Request {
   if (!isValidSep7Uri(uri).result) {
@@ -110,6 +122,7 @@ export function decodeSep7Uri(uri: string): Sep7Request {
       xdr: parsed.xdr,
       networkPassphrase: parsed.networkPassphrase,
       message: parsed.msg,
+      pubkey: parsed.pubkey,
     };
   }
 

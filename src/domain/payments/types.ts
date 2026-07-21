@@ -15,6 +15,8 @@ export interface Sep7TxRequest {
   readonly xdr: string;
   readonly networkPassphrase: string;
   readonly message?: string;
+  /** Which public key/signer the URI handler should sign for, if the request specifies one. */
+  readonly pubkey?: string;
 }
 
 export type Sep7Request = Sep7PayRequest | Sep7TxRequest;

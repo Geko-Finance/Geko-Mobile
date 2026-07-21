@@ -6,6 +6,7 @@ import {
   type AssetType,
   type Balance,
 } from "@/src/domain/wallet";
+import type { MultisigAccountConfig } from "@/src/domain/multisig";
 
 /** Maps a single Horizon balance line to a domain balance, or null when unsupported. */
 export function mapHorizonBalanceLine(
@@ -49,4 +50,21 @@ export function mapHorizonBalances(
   return lines
     .map(mapHorizonBalanceLine)
     .filter((balance): balance is Balance => balance !== null);
+}
+
+/** Maps a Horizon account record's `signers`/`thresholds` into the app's domain shape. */
+export function mapHorizonMultisigConfig(
+  account: Pick<Horizon.ServerApi.AccountRecord, "signers" | "thresholds">
+): MultisigAccountConfig {
+  return {
+    signers: account.signers.map((signer) => ({
+      publicKey: signer.key,
+      weight: signer.weight,
+    })),
+    thresholds: {
+      low: account.thresholds.low_threshold,
+      medium: account.thresholds.med_threshold,
+      high: account.thresholds.high_threshold,
+    },
+  };
 }

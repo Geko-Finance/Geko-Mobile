@@ -7,9 +7,10 @@
 import { Wallet } from "@stellar/typescript-wallet-sdk";
 
 import type { Balance, StellarNetworkId } from "@/src/domain/wallet";
+import type { MultisigAccountConfig } from "@/src/domain/multisig";
 
 import { ApiError } from "../api-errors";
-import { mapHorizonBalances } from "./horizon-mapper";
+import { mapHorizonBalances, mapHorizonMultisigConfig } from "./horizon-mapper";
 import {
   STELLAR_NETWORKS,
   createStellarWallet,
@@ -21,6 +22,7 @@ import {
 export interface StellarClient {
   readonly network: StellarNetworkConfig;
   fetchAccountBalances(publicKey: string): Promise<Balance[]>;
+  fetchAccountMultisigConfig(publicKey: string): Promise<MultisigAccountConfig>;
   accountExists(publicKey: string): Promise<boolean>;
 }
 
@@ -88,6 +90,10 @@ const createStellarClient = (config: StellarNetworkConfig): StellarClient => {
     async fetchAccountBalances(publicKey: string): Promise<Balance[]> {
       const account = await loadAccount(wallet, publicKey);
       return mapHorizonBalances(account.balances);
+    },
+    async fetchAccountMultisigConfig(publicKey: string): Promise<MultisigAccountConfig> {
+      const account = await loadAccount(wallet, publicKey);
+      return mapHorizonMultisigConfig(account);
     },
     async accountExists(publicKey: string): Promise<boolean> {
       try {

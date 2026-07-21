@@ -13,6 +13,7 @@ import { useActiveNetworkId } from "@/src/features/wallet/api/wallet-queries";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 import {
   createStellarWallet,
+  createTextMemo,
   getActiveStellarNetwork,
 } from "@/src/services/api/stellar/stellar-config";
 import { getWalletSigner } from "@/src/services/wallet/signer-factory";
@@ -81,6 +82,7 @@ export function ConfirmPaymentScreen() {
 
       const builder = await wallet.stellar().transaction({
         sourceAddress: PublicKeypair.fromPublicKey(account.publicKey),
+        memo: memo !== undefined ? createTextMemo(memo) : undefined,
       });
       const unsignedTransaction = builder
         .transfer(destination, asset, amount)

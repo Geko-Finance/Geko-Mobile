@@ -4,8 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import QRCode from "react-native-qrcode-svg";
 
-import { evaluatePendingTx } from "@/src/domain/multisig";
-import type { PendingTx } from "@/src/domain/multisig";
+import { describeTransactionOperations, evaluatePendingTx } from "@/src/domain/multisig";
+import type { OperationSummary, PendingTx } from "@/src/domain/multisig";
 import { encodeSep7TxRequest } from "@/src/domain/payments";
 import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
 import { useWalletAccount } from "@/src/features/wallet/state/wallet-store";
@@ -18,6 +18,64 @@ import {
 
 function formatPublicKey(publicKey: string): string {
   return `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
+}
+
+/**
+ * Renders one decoded operation as human-readable line(s), so a co-signer can see exactly what
+ * they're about to Sign/Submit rather than only a collected-weight count. See
+ * `describeTransactionOperations`'s docblock for why this matters: a shared/scanned pending
+ * transaction could otherwise be a `setOptions` adding an attacker as a signer, or a payment to an
+ * unexpected address, with zero visibility before signing.
+ */
+function describeOperationForDisplay(summary: OperationSummary): string {
+  if (summary.type === "payment") {
+    const assetLabel =
+      summary.assetIssuer === undefined
+        ? summary.assetCode
+        : `${summary.assetCode} (${formatPublicKey(summary.assetIssuer)})`;
+
+    return `Pay ${summary.amount} ${assetLabel} to ${formatPublicKey(summary.destination)}`;
+  }
+
+  if (summary.type === "setOptions") {
+    const lines: string[] = [];
+
+    if (summary.signerChange !== undefined) {
+      lines.push(
+        summary.signerChange.weight === 0
+          ? `Removes signer ${formatPublicKey(summary.signerChange.publicKey)}`
+          : `Adds/updates signer ${formatPublicKey(summary.signerChange.publicKey)} to weight ${summary.signerChange.weight}`
+      );
+    }
+
+    if (summary.hasNonKeySignerChange === true) {
+      lines.push("Changes a non-key signer (hash, pre-authorized tx, or signed payload)");
+    }
+
+    if (summary.lowThreshold !== undefined) {
+      lines.push(`Sets low threshold to ${summary.lowThreshold}`);
+    }
+
+    if (summary.medThreshold !== undefined) {
+      lines.push(`Sets medium threshold to ${summary.medThreshold}`);
+    }
+
+    if (summary.highThreshold !== undefined) {
+      lines.push(`Sets high threshold to ${summary.highThreshold}`);
+    }
+
+    if (summary.masterWeight !== undefined) {
+      lines.push(`Sets this account's own key weight to ${summary.masterWeight}`);
+    }
+
+    if (summary.homeDomain !== undefined) {
+      lines.push(`Sets home domain to "${summary.homeDomain}"`);
+    }
+
+    return lines.length > 0 ? lines.join("\n") : "Changes account options";
+  }
+
+  return `${summary.operationType} operation`;
 }
 
 /** Clears one key from a `Record`-shaped piece of state, used to reset a per-row error before retrying that row's action. */
@@ -135,6 +193,27 @@ export function PendingApprovalsScreen() {
           const submitError = submitErrorByTxId[pendingTx.id];
           const txLabel = pendingTx.id.slice(0, 8);
 
+          // Decode what this transaction actually does BEFORE any Sign/Submit control is even
+          // shown — a co-signer must never be asked to authorize a transaction with only a
+          // weight count and no visibility into its contents (see `describeTransactionOperations`
+          // for why: a shared/scanned XDR could otherwise be an arbitrary payment or a `setOptions`
+          // adding an attacker as a signer). If it can't be decoded at all, treat that as reason
+          // to block signing/submitting, not to fall back to blind-signing.
+          let operationSummaries: OperationSummary[] | null = null;
+          let describeError: string | null = null;
+          try {
+            operationSummaries = describeTransactionOperations(
+              pendingTx.envelopeXdr,
+              pendingTx.networkPassphrase
+            );
+          } catch (thrown) {
+            describeError =
+              thrown instanceof Error
+                ? thrown.message
+                : "Unable to decode this transaction's contents.";
+          }
+          const canSignOrSubmit = describeError === null;
+
           return (
             <View
               key={pendingTx.id}
@@ -150,13 +229,33 @@ export function PendingApprovalsScreen() {
                   : evaluation.signedBy.map(formatPublicKey).join(", ")}
               </Text>
 
+              <View className="mt-4 rounded-[16px] bg-[#1E1E20] px-4 py-3">
+                <Text className="text-[12px] font-bold uppercase tracking-wide text-[#8E8E92]">
+                  This transaction will
+                </Text>
+                {operationSummaries !== null ? (
+                  operationSummaries.map((summary, index) => (
+                    <Text
+                      key={index}
+                      className="mt-1.5 text-[14px] font-semibold text-white"
+                    >
+                      {describeOperationForDisplay(summary)}
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="mt-1.5 text-[14px] font-semibold text-[#FF6B6B]">
+                    {describeError}
+                  </Text>
+                )}
+              </View>
+
               <View className="mt-4 flex-row flex-wrap gap-2">
                 {!hasSigned ? (
                   <Pressable
                     accessibilityLabel={`Sign transaction ${txLabel}`}
                     accessibilityRole="button"
                     className="rounded-full bg-[#242426] px-4 py-2.5"
-                    disabled={isSigning}
+                    disabled={isSigning || !canSignOrSubmit}
                     onPress={() => {
                       void handleSign(pendingTx);
                     }}
@@ -182,7 +281,7 @@ export function PendingApprovalsScreen() {
                   accessibilityLabel={`Submit transaction ${txLabel}`}
                   accessibilityRole="button"
                   className="rounded-full bg-[#5BED97] px-4 py-2.5"
-                  disabled={!evaluation.isSatisfied || isSubmitting}
+                  disabled={!evaluation.isSatisfied || isSubmitting || !canSignOrSubmit}
                   onPress={() => {
                     void handleSubmit(pendingTx);
                   }}

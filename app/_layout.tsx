@@ -17,10 +17,6 @@ import { SafeAreaProvider } from "@/src/providers/safe-area-provider/SafeAreaPro
 import { GluestackUIProvider } from "@gluestack-ui-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
-export const unstable_settings = {
-  anchor: "(app)",
-};
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 

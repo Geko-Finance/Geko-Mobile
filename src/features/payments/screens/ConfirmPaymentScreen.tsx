@@ -11,12 +11,17 @@ import {
 import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
 import { useActiveNetworkId } from "@/src/features/wallet/api/wallet-queries";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
+import { getHttpStatus } from "@/src/services/api/stellar/stellar-client";
 import {
   createStellarWallet,
   createTextMemo,
   getActiveStellarNetwork,
 } from "@/src/services/api/stellar/stellar-config";
 import { getWalletSigner } from "@/src/services/wallet/signer-factory";
+
+const HORIZON_TIMEOUT_STATUS = 504;
+const TIMEOUT_SUBMIT_ERROR_MESSAGE =
+  "The network timed out. Check your account history before trying again — this payment may have already gone through.";
 
 type ConfirmParams = {
   amount?: string;
@@ -98,9 +103,18 @@ export function ConfirmPaymentScreen() {
 
       router.replace("/payments/success");
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Payment failed to submit."
-      );
+      if (getHttpStatus(error) === HORIZON_TIMEOUT_STATUS) {
+        // Stellar.submitTransaction() retries 504s with backoff and only rethrows the raw
+        // timeout once every retry is exhausted — at that point the on-chain outcome is
+        // genuinely indeterminate (Horizon may have ingested the transaction without
+        // responding in time), so this is not a generic failure the user should treat as
+        // "nothing happened."
+        setSubmitError(TIMEOUT_SUBMIT_ERROR_MESSAGE);
+      } else {
+        setSubmitError(
+          error instanceof Error ? error.message : "Payment failed to submit."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }

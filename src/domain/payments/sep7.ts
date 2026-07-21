@@ -27,6 +27,37 @@ function assertValidAssetPair(
   }
 }
 
+/**
+ * Text-equivalent `memo_type` values we accept: the raw SEP-7 spec form (`MEMO_TEXT`, as used
+ * in real-world URIs) and the wallet-sdk's own lowercase `MemoType` union form (`text`, as
+ * `Sep7Pay.memoType`'s getter is a raw, unvalidated passthrough of the URI's `memo_type` query
+ * param — it does not normalize or restrict it to the SDK's own `MemoType` values). Compared
+ * case-insensitively so either casing is accepted.
+ */
+const TEXT_MEMO_TYPE_VALUES = new Set(["text", "memo_text"]);
+
+/**
+ * Rejects any scanned `memo_type` other than MEMO_TEXT (or an absent `memo_type`, which per the
+ * SEP-7 spec defaults to MEMO_TEXT when `memo` is present). We only support MEMO_TEXT today —
+ * `LocalWalletSigner`/`ConfirmPaymentScreen` only ever construct a text memo — so an
+ * `MEMO_ID`/`MEMO_HASH`/`MEMO_RETURN` request must fail loudly here rather than have its memo
+ * silently re-typed as text on submission (e.g. a numeric `MEMO_ID` deposit-routing code sent as
+ * MEMO_TEXT reaches the chain fine but the receiving exchange won't credit it — silent,
+ * unrecoverable fund loss). Real multi-type support is a follow-up task.
+ */
+function assertValidMemoType(memoType: string | undefined): void {
+  if (memoType === undefined) {
+    return;
+  }
+
+  if (!TEXT_MEMO_TYPE_VALUES.has(memoType.toLowerCase())) {
+    throw new Error(
+      `SEP-7 pay request memo type "${memoType}" is not supported yet (only MEMO_TEXT); ` +
+        "sending it would silently misrepresent the memo on-chain"
+    );
+  }
+}
+
 /** Encodes a payment request as a `web+stellar:pay` SEP-7 URI. */
 export function encodeSep7PayRequest(request: Sep7PayRequest): string {
   assertValidDestination(request.destination);
@@ -56,6 +87,7 @@ export function decodeSep7Uri(uri: string): Sep7Request {
     }
 
     assertValidAssetPair(parsed.assetCode, parsed.assetIssuer);
+    assertValidMemoType(parsed.memoType);
 
     return {
       kind: "pay",

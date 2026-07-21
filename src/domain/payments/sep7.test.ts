@@ -88,4 +88,30 @@ describe("decodeSep7Uri", () => {
 
     expect(() => decodeSep7Uri(uri)).toThrow(/asset_issuer/i);
   });
+
+  it("throws on a pay URI with a non-text memo_type (e.g. MEMO_ID)", () => {
+    const uri = `web+stellar:pay?destination=${DESTINATION}&memo=837465&memo_type=id`;
+
+    expect(() => decodeSep7Uri(uri)).toThrow(/memo type/i);
+  });
+
+  it("accepts a pay URI with an explicit memo_type=MEMO_TEXT", () => {
+    const uri = `web+stellar:pay?destination=${DESTINATION}&memo=invoice-42&memo_type=MEMO_TEXT`;
+
+    expect(decodeSep7Uri(uri)).toEqual({
+      kind: "pay",
+      destination: DESTINATION,
+      memo: "invoice-42",
+    });
+  });
+
+  it("accepts a pay URI with a memo but no memo_type (defaults to text per SEP-7)", () => {
+    const uri = `web+stellar:pay?destination=${DESTINATION}&memo=invoice-42`;
+
+    expect(decodeSep7Uri(uri)).toEqual({
+      kind: "pay",
+      destination: DESTINATION,
+      memo: "invoice-42",
+    });
+  });
 });

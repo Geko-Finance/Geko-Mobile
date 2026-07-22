@@ -3,7 +3,6 @@ import {
   Bell,
   ChevronDown,
   CircleDollarSign,
-  Grid2X2,
   Send,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -12,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { canSend } from "@/src/domain/wallet";
+import { GekoIcon } from "@/src/features/home/components/GekoIcon";
 import {
   CARD_ASSETS,
   FinanceCard,
@@ -170,7 +170,14 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-8 flex-row items-center justify-between">
-          <Grid2X2 color="#FFFFFF" fill="#FFFFFF" size={25} strokeWidth={2.5} />
+          <Pressable
+            accessibilityLabel="Open wallets"
+            accessibilityRole="button"
+            hitSlop={10}
+            onPress={() => router.push("/wallet")}
+          >
+            <GekoIcon />
+          </Pressable>
           <Bell color="#8E8E92" fill="#8E8E92" size={25} strokeWidth={2.5} />
         </View>
 

@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -8,37 +9,75 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 
-import { useLoginMutation } from "@/src/features/auth/api/auth-queries";
-import { resolvePostLoginRoute } from "@/src/features/auth/session/post-login-route";
+import {
+  useSendOtp,
+  useSocialLogin,
+  useVerifyOtp,
+} from "@/src/features/auth/api/cavos-auth-queries";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
+import type { ResolvedAuthIdentity } from "@/src/services/api/cavos-auth/cavos-auth-client";
 
-// useLoginMutation → login() is fully mocked and accepts any password until a real backend exists.
 export function LoginScreen() {
   const router = useRouter();
   const { signIn } = useSession();
-  const loginMutation = useLoginMutation();
+  const sendOtp = useSendOtp();
+  const verifyOtp = useVerifyOtp();
+  const googleLogin = useSocialLogin("google");
+  const appleLogin = useSocialLogin("apple");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
 
-  const isSubmitDisabled =
-    email.trim().length === 0 ||
-    password.length === 0 ||
-    loginMutation.isPending;
+  const finishLogin = async (identity: ResolvedAuthIdentity) => {
+    await signIn({
+      user: { id: identity.userId, email: identity.email, name: identity.name },
+    });
+    // (app)/_layout.tsx's wallet-ownership guard takes it from here - it redirects
+    // to onboarding itself if this session's user doesn't own a wallet yet.
+    router.replace("/home");
+  };
 
-  const handleLogin = async () => {
+  const handleSendCode = async () => {
     try {
-      const session = await loginMutation.mutateAsync({
-        email: email.trim(),
-        password,
-      });
-      await signIn(session);
-      router.replace(resolvePostLoginRoute());
+      await sendOtp.mutateAsync(email.trim());
+      setCodeSent(true);
     } catch {
-      // Mutation isError/error state drives inline error display below.
+      // sendOtp.isError drives inline error display below.
     }
   };
+
+  const handleVerifyCode = async () => {
+    try {
+      const identity = await verifyOtp.mutateAsync({
+        email: email.trim(),
+        code: code.trim(),
+      });
+      await finishLogin(identity);
+    } catch {
+      // verifyOtp.isError drives inline error display below.
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const identity = await googleLogin.mutateAsync();
+      await finishLogin(identity);
+    } catch {
+      // googleLogin.isError drives inline error display below.
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    try {
+      const identity = await appleLogin.mutateAsync();
+      await finishLogin(identity);
+    } catch {
+      // appleLogin.isError drives inline error display below.
+    }
+  };
+
+  const isSocialPending = googleLogin.isPending || appleLogin.isPending;
 
   return (
     <ImageBackground
@@ -60,12 +99,57 @@ export function LoginScreen() {
             Log in to continue to your wallet.
           </Text>
 
-          <View className="mt-6 rounded-[20px] bg-[#121214] px-4 py-4">
+          <View className="mt-6 gap-2.5">
+            <Pressable
+              accessibilityRole="button"
+              className="h-12 items-center justify-center rounded-[11px] bg-white"
+              disabled={isSocialPending}
+              onPress={handleGoogleLogin}
+            >
+              {googleLogin.isPending ? (
+                <ActivityIndicator color="#070812" size="small" />
+              ) : (
+                <Text className="text-sm font-bold text-[#070812]">
+                  Continue with Google
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              className="h-12 items-center justify-center rounded-[11px] bg-black"
+              disabled={isSocialPending}
+              onPress={handleAppleLogin}
+            >
+              {appleLogin.isPending ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text className="text-sm font-bold text-white">
+                  Continue with Apple
+                </Text>
+              )}
+            </Pressable>
+
+            {googleLogin.isError || appleLogin.isError ? (
+              <Text className="text-[13px] font-semibold text-[#FF6B6B]">
+                Sign-in failed. Please try again.
+              </Text>
+            ) : null}
+          </View>
+
+          <View className="mt-5 flex-row items-center gap-3">
+            <View className="h-[1px] flex-1 bg-[#242426]" />
+            <Text className="text-[12px] font-bold text-[#6E6E72]">OR</Text>
+            <View className="h-[1px] flex-1 bg-[#242426]" />
+          </View>
+
+          <View className="mt-5 rounded-[20px] bg-[#121214] px-4 py-4">
             <TextInput
               autoCapitalize="none"
               autoComplete="email"
               autoCorrect={false}
               className="rounded-xl bg-[#1E1E20] px-4 py-3 text-[15px] font-semibold text-white"
+              editable={!codeSent}
               keyboardType="email-address"
               placeholder="Email"
               placeholderTextColor="#6E6E72"
@@ -73,39 +157,71 @@ export function LoginScreen() {
               onChangeText={setEmail}
             />
 
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3 text-[15px] font-semibold text-white"
-              placeholder="Password"
-              placeholderTextColor="#6E6E72"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            {codeSent ? (
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3 text-[15px] font-semibold text-white"
+                keyboardType="number-pad"
+                placeholder="6-digit code"
+                placeholderTextColor="#6E6E72"
+                value={code}
+                onChangeText={setCode}
+              />
+            ) : null}
 
-            {loginMutation.isError ? (
+            {sendOtp.isError ? (
               <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
-                Something went wrong. Please try again.
+                Couldn&apos;t send a code - please check the email and try again.
+              </Text>
+            ) : null}
+
+            {verifyOtp.isError ? (
+              <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
+                That code didn&apos;t work - please try again.
               </Text>
             ) : null}
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            className="mt-[18px] h-12 items-center justify-center rounded-[11px] bg-[#237BFF]"
-            disabled={isSubmitDisabled}
-            onPress={handleLogin}
-          >
-            {loginMutation.isPending ? (
-              <View className="flex-row items-center gap-2">
-                <ActivityIndicator color="#FFFFFF" size="small" />
-                <Text className="text-sm font-bold text-white">Logging in…</Text>
-              </View>
-            ) : (
-              <Text className="text-sm font-bold text-white">Log in</Text>
-            )}
-          </Pressable>
+          {codeSent ? (
+            <Pressable
+              accessibilityRole="button"
+              className="mt-[18px] h-12 items-center justify-center rounded-[11px] bg-[#237BFF]"
+              disabled={code.trim().length === 0 || verifyOtp.isPending}
+              onPress={handleVerifyCode}
+            >
+              {verifyOtp.isPending ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text className="text-sm font-bold text-white">
+                    Verifying…
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-sm font-bold text-white">
+                  Verify &amp; log in
+                </Text>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              className="mt-[18px] h-12 items-center justify-center rounded-[11px] bg-[#237BFF]"
+              disabled={email.trim().length === 0 || sendOtp.isPending}
+              onPress={handleSendCode}
+            >
+              {sendOtp.isPending ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text className="text-sm font-bold text-white">
+                    Sending code…
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-sm font-bold text-white">Send code</Text>
+              )}
+            </Pressable>
+          )}
 
           <Pressable
             accessibilityRole="button"

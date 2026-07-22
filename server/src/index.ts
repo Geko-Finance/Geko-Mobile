@@ -1,6 +1,35 @@
 import "fake-indexeddb/auto";
 
-import { Cavos, generateRecoveryCode } from "@cavos/kit";
+// CavosAuth guards its OAuth URL methods on `typeof window === "undefined"`, and after a
+// successful OTP/OAuth verify it unconditionally calls `window.localStorage.setItem(...)`
+// to remember the last identity for browser apps (verified in the compiled SDK) - neither
+// needs a real browser, so a minimal window+localStorage stub satisfies both without faking
+// one. Without the localStorage piece, verify crashes with a client-facing 500 *after* Cavos
+// has already accepted the code/OAuth callback, silently burning a one-time-use OTP code.
+//
+// `isSecureContext: true` is required too: Cavos's device-key WebCrypto path
+// (`assertSecureContext` in @cavos/kit) only skips its browser secure-context check when
+// `window` is *undefined* - once this stub defines `window` at all, it falls through to
+// checking `window.isSecureContext`, which would otherwise be undefined and wrongly fail
+// wallet connect/create/recover here even though Node's own `crypto.subtle` is available
+// and this backend is a trusted local service, not a public browser origin.
+if (typeof (globalThis as { window?: unknown }).window === "undefined") {
+  const memoryStorage = new Map<string, string>();
+  (globalThis as { window?: unknown }).window = {
+    isSecureContext: true,
+    localStorage: {
+      getItem: (key: string) => memoryStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        memoryStorage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        memoryStorage.delete(key);
+      },
+    },
+  };
+}
+
+import { Cavos, CavosAuth, generateRecoveryCode } from "@cavos/kit";
 import cors from "cors";
 import dotenv from "dotenv";
 import express, { type Request, type Response } from "express";
@@ -19,6 +48,8 @@ if (!CAVOS_APP_ID || CAVOS_APP_ID.trim().length === 0) {
   console.error("Fatal: CAVOS_APP_ID is required. Set it in server/.env");
   process.exit(1);
 }
+
+const cavosAuth = new CavosAuth({ appId: CAVOS_APP_ID });
 
 const app = express();
 
@@ -306,6 +337,96 @@ app.get("/api/cavos/balance", async (req: Request, res: Response) => {
     res.status(200).json({ stroops: stroops.toString() });
   } catch (error) {
     console.error("GET /api/cavos/balance failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.post("/api/auth/otp/send", async (req: Request, res: Response) => {
+  const { email } = req.body as { email?: unknown };
+
+  if (typeof email !== "string" || email.trim().length === 0) {
+    res.status(400).json({ error: "email is required and must be a non-empty string" });
+    return;
+  }
+
+  try {
+    await cavosAuth.sendOtp(email.trim());
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("POST /api/auth/otp/send failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.post("/api/auth/otp/verify", async (req: Request, res: Response) => {
+  const { email, code } = req.body as { email?: unknown; code?: unknown };
+
+  if (typeof email !== "string" || email.trim().length === 0) {
+    res.status(400).json({ error: "email is required and must be a non-empty string" });
+    return;
+  }
+
+  if (typeof code !== "string" || code.trim().length === 0) {
+    res.status(400).json({ error: "code is required and must be a non-empty string" });
+    return;
+  }
+
+  try {
+    const identity = await cavosAuth.verifyOtp(email.trim(), code.trim());
+    res.status(200).json({ userId: identity.userId, email: identity.email, name: identity.name });
+  } catch (error) {
+    console.error("POST /api/auth/otp/verify failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.get("/api/auth/oauth/google-url", async (req: Request, res: Response) => {
+  const redirectUri = req.query.redirectUri;
+
+  if (typeof redirectUri !== "string" || redirectUri.trim().length === 0) {
+    res.status(400).json({ error: "redirectUri query parameter is required" });
+    return;
+  }
+
+  try {
+    const url = await cavosAuth.getGoogleOAuthUrl(redirectUri);
+    res.status(200).json({ url });
+  } catch (error) {
+    console.error("GET /api/auth/oauth/google-url failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.get("/api/auth/oauth/apple-url", async (req: Request, res: Response) => {
+  const redirectUri = req.query.redirectUri;
+
+  if (typeof redirectUri !== "string" || redirectUri.trim().length === 0) {
+    res.status(400).json({ error: "redirectUri query parameter is required" });
+    return;
+  }
+
+  try {
+    const url = await cavosAuth.getAppleOAuthUrl(redirectUri);
+    res.status(200).json({ url });
+  } catch (error) {
+    console.error("GET /api/auth/oauth/apple-url failed:", error);
+    res.status(500).json({ error: sdkErrorMessage(error) });
+  }
+});
+
+app.post("/api/auth/oauth/callback", async (req: Request, res: Response) => {
+  const { authData } = req.body as { authData?: unknown };
+
+  if (typeof authData !== "string" || authData.trim().length === 0) {
+    res.status(400).json({ error: "authData is required and must be a non-empty string" });
+    return;
+  }
+
+  try {
+    const identity = await cavosAuth.handleCallback(authData.trim());
+    res.status(200).json({ userId: identity.userId, email: identity.email, name: identity.name });
+  } catch (error) {
+    console.error("POST /api/auth/oauth/callback failed:", error);
     res.status(500).json({ error: sdkErrorMessage(error) });
   }
 });

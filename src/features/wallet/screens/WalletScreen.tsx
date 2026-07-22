@@ -25,6 +25,8 @@ import {
   useWalletAccounts,
   useWalletStore,
 } from "@/src/features/wallet/state/wallet-store";
+import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
+import { removeLocalWallet } from "@/src/services/wallet/local-wallet-service";
 
 function formatPublicKey(publicKey: string): string {
   return `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
@@ -115,6 +117,16 @@ export function WalletScreen() {
           <Text className="flex-1 text-[32px] font-extrabold text-white">
             Wallets
           </Text>
+          <Pressable
+            accessibilityLabel="Open contacts"
+            accessibilityRole="button"
+            className="rounded-full bg-[#242426] px-3 py-1.5"
+            onPress={() => router.push("/contacts")}
+          >
+            <Text className="text-[12px] font-bold text-[#D8D8DC]">
+              Contacts
+            </Text>
+          </Pressable>
           <View className="rounded-full bg-[#123B2B] px-3 py-1.5">
             <Text className="text-[12px] font-bold text-[#5BED97]">
               {networkLabel}
@@ -178,7 +190,19 @@ export function WalletScreen() {
                           text: "Remove",
                           style: "destructive",
                           onPress: () => {
-                            removeAccount(entry.id);
+                            void (async () => {
+                              try {
+                                if (entry.custody === "non_custodial") {
+                                  await removeLocalWallet(entry.publicKey);
+                                }
+                                removeAccount(entry.id);
+                              } catch (caught) {
+                                Alert.alert(
+                                  "Unable to remove wallet",
+                                  getLocalWalletErrorMessage(caught)
+                                );
+                              }
+                            })();
                           },
                         },
                       ]);
@@ -195,6 +219,29 @@ export function WalletScreen() {
         <Text className="mb-3 mt-6 text-[20px] font-extrabold text-white">
           Add wallet
         </Text>
+
+        <View className="mb-4 flex-row gap-3">
+          <Pressable
+            accessibilityLabel="Create self-custody wallet"
+            accessibilityRole="button"
+            className="min-h-14 flex-1 items-center justify-center rounded-[16px] bg-[#237BFF] px-3"
+            onPress={() => router.push("/wallet/create")}
+          >
+            <Text className="text-center text-[14px] font-bold text-white">
+              Create wallet
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Import existing wallet"
+            accessibilityRole="button"
+            className="min-h-14 flex-1 items-center justify-center rounded-[16px] bg-[#242426] px-3"
+            onPress={() => router.push("/wallet/import")}
+          >
+            <Text className="text-center text-[14px] font-bold text-white">
+              Import wallet
+            </Text>
+          </Pressable>
+        </View>
 
         <View className="overflow-hidden rounded-[20px] bg-[#121214] px-4 py-4">
           <TextInput

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { useWalletStore } from "@/src/features/wallet/state/wallet-store";
 import { deviceBiometricAuthorizer } from "@/src/services/wallet/biometric-authorizer";
 import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
@@ -22,6 +23,7 @@ import {
 export function ImportSelfCustodyWalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
   const accounts = useWalletStore((state) => state.accounts);
   const addAccount = useWalletStore((state) => state.addAccount);
   const [name, setName] = useState("");
@@ -44,6 +46,10 @@ export function ImportSelfCustodyWalletScreen() {
       return;
     }
 
+    if (session === null) {
+      return;
+    }
+
     setIsWorking(true);
     try {
       const material = importLocalWalletMaterial(recovery);
@@ -58,6 +64,7 @@ export function ImportSelfCustodyWalletScreen() {
         custody: "non_custodial",
         id: material.publicKey,
         name: name.trim() || "Imported wallet",
+        ownerUserId: session.user.id,
         publicKey: material.publicKey,
       });
       router.replace({

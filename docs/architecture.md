@@ -34,7 +34,6 @@ Examples:
 - `Account`
 - `Transaction`
 - `Payment`
-- `CustomerProfile`
 - `KycState`
 
 ## Mock-First Rule

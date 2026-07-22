@@ -1,11 +1,10 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { appConfig } from "@/src/config/env";
 import type { WalletAccount } from "@/src/domain/wallet";
+import { useSessionStore } from "@/src/features/auth/session/session-store";
 import { asyncStateStorage } from "@/src/services/storage/async-json-storage";
-
-import { DEV_SEED_ACCOUNTS } from "./wallet-seed";
 
 interface WalletState {
   accounts: WalletAccount[];
@@ -28,21 +27,14 @@ const resolveActiveAccountId = (
   return accounts[0]?.id ?? null;
 };
 
-const initialAccounts =
-  appConfig.environment === "development" ? DEV_SEED_ACCOUNTS : [];
+const initialAccounts: WalletAccount[] = [];
 
-const initialActiveAccountId =
-  appConfig.environment === "development"
-    ? (DEV_SEED_ACCOUNTS[0]?.id ?? null)
-    : null;
+const initialActiveAccountId = null;
 
 /**
  * Wallet account metadata state for the foundation epic.
- * Persists account metadata (names, public keys, custody kind — never secrets) via AsyncStorage;
- * dev seeds populate the initial state and are written on first launch; after that, rehydrated
- * state wins, so removed seeds stay removed. Hydration is asynchronous — on later launches the
- * seeds may flash briefly before rehydration replaces them, which is acceptable for the
- * mock-first phase. SecureStore stays reserved for secrets per CLAUDE.md.
+ * Persists account metadata (names, public keys, custody kind - never secrets) via AsyncStorage;
+ * SecureStore stays reserved for secrets per CLAUDE.md.
  */
 export const useWalletStore = create<WalletState>()(
   persist(
@@ -108,32 +100,51 @@ export const useWalletStore = create<WalletState>()(
   )
 );
 
-/** Returns the currently active wallet account, if any. */
-export function selectActiveAccount(state: WalletState): WalletAccount | null {
-  if (state.activeAccountId === null) {
-    return null;
+/**
+ * Subscribes to the wallet account list, filtered to the signed-in session's own accounts.
+ * wallet-store persists across sign-outs (it's account metadata, not a secret), so every
+ * read path must filter by owner - otherwise one profile would see another profile's
+ * locally-cached accounts on the same device.
+ */
+export function useWalletAccounts(): WalletAccount[] {
+  const ownerUserId = useSessionStore((state) => state.session?.user.id);
+  const accounts = useWalletStore((state) => state.accounts);
+
+  // `.filter()` returns a new array every call - memoize it, since a zustand
+  // selector that returns a fresh reference each render breaks the store's
+  // getSnapshot equality check and causes an infinite render loop.
+  return useMemo(
+    () =>
+      ownerUserId === undefined
+        ? []
+        : accounts.filter((account) => account.ownerUserId === ownerUserId),
+    [accounts, ownerUserId]
+  );
+}
+
+/** Subscribes to the currently active wallet account, scoped to the signed-in session. */
+export function useActiveAccount(): WalletAccount | null {
+  const accounts = useWalletAccounts();
+  const activeAccountId = useWalletStore((state) => state.activeAccountId);
+
+  if (activeAccountId !== null) {
+    const active = accounts.find((account) => account.id === activeAccountId);
+
+    if (active !== undefined) {
+      return active;
+    }
   }
 
-  return state.accounts.find((account) => account.id === state.activeAccountId) ?? null;
+  return accounts[0] ?? null;
 }
 
-/** Subscribes to the full wallet account list. */
-export function useWalletAccounts(): WalletAccount[] {
-  return useWalletStore((state) => state.accounts);
-}
-
-/** Subscribes to the currently active wallet account. */
-export function useActiveAccount(): WalletAccount | null {
-  return useWalletStore((state) => selectActiveAccount(state));
-}
-
-/** Subscribes to a single wallet account by id. */
+/** Subscribes to a single wallet account by id, scoped to the signed-in session. */
 export function useWalletAccount(
   accountId: string | undefined
 ): WalletAccount | undefined {
-  return useWalletStore((state) =>
-    accountId === undefined
-      ? undefined
-      : state.accounts.find((account) => account.id === accountId)
-  );
+  const accounts = useWalletAccounts();
+
+  return accountId === undefined
+    ? undefined
+    : accounts.find((account) => account.id === accountId);
 }

@@ -6,6 +6,9 @@ type AppEnvironment = "development" | "preview" | "production";
 
 interface AppConfig {
   apiBaseUrl: string;
+  cavosAppId: string;
+  cavosBackendUrl: string;
+  cavosAppSalt: string;
   environment: AppEnvironment;
   requestTimeoutMs: number;
   stellarNetwork: StellarNetworkId;
@@ -34,6 +37,25 @@ export const appConfig: AppConfig = {
     typeof extra.apiBaseUrl === "string"
       ? extra.apiBaseUrl
       : "https://api.example.com",
+  cavosAppId:
+    typeof process.env.EXPO_PUBLIC_CAVOS_APP_ID === "string" &&
+    process.env.EXPO_PUBLIC_CAVOS_APP_ID.length > 0
+      ? process.env.EXPO_PUBLIC_CAVOS_APP_ID
+      : typeof extra.cavosAppId === "string" && extra.cavosAppId.length > 0
+        ? extra.cavosAppId
+        : "",
+  cavosBackendUrl:
+    typeof process.env.EXPO_PUBLIC_CAVOS_BACKEND_URL === "string" &&
+    process.env.EXPO_PUBLIC_CAVOS_BACKEND_URL.length > 0
+      ? process.env.EXPO_PUBLIC_CAVOS_BACKEND_URL
+      : typeof extra.cavosBackendUrl === "string" &&
+          extra.cavosBackendUrl.length > 0
+        ? extra.cavosBackendUrl
+        : "http://localhost:4000",
+  cavosAppSalt:
+    typeof extra.cavosAppSalt === "string"
+      ? extra.cavosAppSalt
+      : "geko-mobile",
   environment: toEnvironment(extra.environment),
   requestTimeoutMs:
     typeof extra.requestTimeoutMs === "number" ? extra.requestTimeoutMs : 15000,

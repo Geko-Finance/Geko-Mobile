@@ -2,10 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appConfig } from "@/src/config/env";
 import type { Balance, StellarNetworkId, WalletAccount } from "@/src/domain/wallet";
-import {
-  createCustodialAccount,
-  recoverCustodialAccount,
-} from "@/src/services/api/cavos/cavos-account-factory";
+import { useSession } from "@/src/features/auth/session/SessionProvider";
+import { connectCustodialAccount } from "@/src/services/api/cavos/cavos-account-factory";
 import { signTestCustodialPayment } from "@/src/services/api/cavos/cavos-test-payment";
 import type { CavosIdentity } from "@/src/services/api/cavos/cavos-types";
 import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
@@ -62,19 +60,26 @@ export function useAccountTransactions(publicKey: string | undefined) {
 }
 
 /**
- * Dev/testnet-only flow — generates a keypair, discards the secret (watch-only),
+ * Dev/testnet-only flow - generates a keypair, discards the secret (watch-only),
  * funds via Friendbot, and registers the account; fails with ApiError(400) on
  * networks without Friendbot.
  */
 export function useCreateTestWallet() {
+  const { session } = useSession();
+
   return useMutation({
     mutationFn: async (_input: { name: string }) => createFundedTestAccount(),
     onSuccess: ({ publicKey }, input) => {
+      if (session === null) {
+        return;
+      }
+
       useWalletStore.getState().addAccount({
         createdAt: new Date().toISOString(),
         custody: "watch_only",
         id: publicKey,
         name: input.name.trim() || "Test Wallet",
+        ownerUserId: session.user.id,
         publicKey,
       });
     },
@@ -98,26 +103,17 @@ export function useFundTestnetAccount() {
   });
 }
 
-/** Connects a Cavos custodial wallet, persists the session, and registers the account locally. */
-export function useCreateCustodialWallet() {
-  return useMutation({
-    mutationFn: async (input: { identity: CavosIdentity; name: string }) =>
-      createCustodialAccount(input.identity, input.name),
-    onSuccess: (account) => {
-      useWalletStore.getState().addAccount(account);
-    },
-  });
-}
-
 /**
- * Reconnects a Cavos custodial wallet for the given identity and registers it locally.
- * Preserves an existing local display name when the account is already known.
+ * Connects a Cavos custodial wallet for the given identity and registers it locally -
+ * covers both first-time creation and reconnecting on a later device (connect is
+ * deterministic per identity, see cavos-account-factory.ts). Preserves an existing
+ * local display name when the account is already known.
  */
-export function useRecoverCustodialWallet() {
+export function useConnectCustodialWallet() {
   return useMutation({
-    mutationFn: async (input: { identity: CavosIdentity }) =>
-      recoverCustodialAccount(input.identity),
-    onSuccess: (account) => {
+    mutationFn: async (input: { identity: CavosIdentity; name?: string }) =>
+      connectCustodialAccount(input.identity, input.name),
+    onSuccess: ({ account }) => {
       const existing = useWalletStore
         .getState()
         .accounts.find((entry) => entry.id === account.id);
@@ -127,6 +123,9 @@ export function useRecoverCustodialWallet() {
           ? account
           : { ...account, name: existing.name }
       );
+    },
+    onError: (error) => {
+      console.error("Custodial wallet connect failed:", error);
     },
   });
 }

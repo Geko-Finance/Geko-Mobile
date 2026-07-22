@@ -17,6 +17,7 @@ import {
   makeWatchOnlyAccount,
 } from "@/src/domain/wallet";
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
+import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { BackButton } from "@/src/features/shared/components/BackButton";
 import {
   useActiveNetworkId,
@@ -49,6 +50,7 @@ function formatCustodyLabel(custody: WalletCustody): string {
 export function WalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
   const accounts = useWalletAccounts();
   const activeAccountId = useWalletStore((state) => state.activeAccountId);
   const addAccount = useWalletStore((state) => state.addAccount);
@@ -66,6 +68,10 @@ export function WalletScreen() {
     (createTestWallet.isError ? createTestWallet.error.message : null);
 
   const handleWatchAddress = () => {
+    if (session === null) {
+      return;
+    }
+
     createTestWallet.reset();
     const key = publicKey.trim();
 
@@ -81,7 +87,9 @@ export function WalletScreen() {
       return;
     }
 
-    addAccount(makeWatchOnlyAccount(name.trim() || "Watched wallet", key));
+    addAccount(
+      makeWatchOnlyAccount(name.trim() || "Watched wallet", key, session.user.id)
+    );
     setName("");
     setPublicKey("");
     setValidationError(null);

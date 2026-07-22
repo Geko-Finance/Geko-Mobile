@@ -48,5 +48,8 @@ export function useRecoverWithCode() {
 
       await setStoredCavosSession(session);
     },
+    onError: (error) => {
+      console.error("Recover-with-code device approval failed:", error);
+    },
   });
 }

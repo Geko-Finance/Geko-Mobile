@@ -117,6 +117,16 @@ export function WalletScreen() {
           <Text className="flex-1 text-[32px] font-extrabold text-white">
             Wallets
           </Text>
+          <Pressable
+            accessibilityLabel="Open contacts"
+            accessibilityRole="button"
+            className="rounded-full bg-[#242426] px-3 py-1.5"
+            onPress={() => router.push("/contacts")}
+          >
+            <Text className="text-[12px] font-bold text-[#D8D8DC]">
+              Contacts
+            </Text>
+          </Pressable>
           <View className="rounded-full bg-[#123B2B] px-3 py-1.5">
             <Text className="text-[12px] font-bold text-[#5BED97]">
               {networkLabel}

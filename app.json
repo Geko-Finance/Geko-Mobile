@@ -47,7 +47,13 @@
       "expo-localization",
       "expo-secure-store",
       "expo-local-authentication",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Geko needs camera access to scan wallet addresses."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -58,6 +64,9 @@
       "environment": "development",
       "requestTimeoutMs": 15000,
       "stellarNetwork": "testnet",
+      "cavosAppId": "",
+      "cavosAppSalt": "geko-mobile",
+      "cavosBackendUrl": "http://localhost:4000",
       "router": {},
       "eas": {
         "projectId": "ce6acf82-0902-40c8-b1ef-542195c6d92e"

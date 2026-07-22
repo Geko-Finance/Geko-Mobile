@@ -51,7 +51,7 @@ describe("LocalSigner", () => {
       publicKey: material.publicKey,
     });
 
-    const signedXdr = await signer.signTransaction(
+    const { xdr: signedXdr } = await signer.signTransaction(
       buildTransaction(material.publicKey),
       { networkPassphrase: Networks.TESTNET }
     );

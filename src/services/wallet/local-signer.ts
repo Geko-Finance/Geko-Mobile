@@ -2,6 +2,7 @@ import { Transaction, TransactionBuilder } from "@stellar/stellar-base";
 
 import type {
   SignTransactionOptions,
+  SignTransactionResult,
   WalletSigner,
 } from "@/src/domain/wallet";
 
@@ -45,7 +46,7 @@ export class LocalSigner implements WalletSigner {
   async signTransaction(
     transactionXdr: string,
     options: SignTransactionOptions
-  ): Promise<string> {
+  ): Promise<SignTransactionResult> {
     await this.authorizer.authorize("Authorize transaction signing");
     const pin = await this.pinProvider();
     const manager = new KeyManager({
@@ -69,7 +70,7 @@ export class LocalSigner implements WalletSigner {
         password: pin,
         transaction,
       });
-      return signed.toXDR();
+      return { xdr: signed.toXDR() };
     } catch {
       const ids = await manager.loadAllKeyIds();
 

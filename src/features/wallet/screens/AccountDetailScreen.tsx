@@ -19,12 +19,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { isNativeAsset } from "@/src/domain/wallet";
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
+import { BackButton } from "@/src/features/shared/components/BackButton";
 import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
 import { Skeleton } from "@/src/features/shared/components/ui/skeleton";
 import {
   isAccountNotFoundError,
   useAccountBalances,
   useActiveNetworkId,
+  useSignTestCustodialPayment,
 } from "@/src/features/wallet/api/wallet-queries";
 import {
   useWalletAccount,
@@ -69,6 +71,21 @@ function formatNetworkLabel(networkId: StellarNetworkId): string {
   return networkId === "testnet" ? "Testnet" : "Mainnet";
 }
 
+function getTestPaymentErrorMessage(error: Error | null): string | null {
+  if (error === null) {
+    return null;
+  }
+
+  switch (error.name) {
+    case "CavosProviderUnavailableError":
+      return "Cavos is temporarily unavailable - please try again in a moment.";
+    case "CavosSessionExpiredError":
+      return "Your Cavos session has expired - recover your wallet again to continue.";
+    default:
+      return "Something went wrong sending the test payment.";
+  }
+}
+
 export function AccountDetailScreen() {
   const { accountId, funding } = useLocalSearchParams<{
     accountId: string;
@@ -92,6 +109,7 @@ export function AccountDetailScreen() {
     isLoading,
     refetch,
   } = useAccountBalances(account?.publicKey);
+  const signTestPayment = useSignTestCustodialPayment();
 
   if (account === undefined) {
     return (
@@ -149,9 +167,10 @@ export function AccountDetailScreen() {
         pinProvider: async () => walletPin,
         publicKey: account.publicKey,
       });
-      const signedXdr = await signer.signTransaction(transaction.toXDR(), {
-        networkPassphrase: network.networkPassphrase,
-      });
+      const { xdr: signedXdr } = await signer.signTransaction(
+        transaction.toXDR(),
+        { networkPassphrase: network.networkPassphrase }
+      );
       const signed = TransactionBuilder.fromXDR(
         signedXdr,
         network.networkPassphrase
@@ -185,6 +204,9 @@ export function AccountDetailScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 16 }}
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-2">
+          <BackButton />
+        </View>
         <Text className="text-[13px] font-bold uppercase tracking-wide text-[#8E8E92]">
           Wallet
         </Text>
@@ -404,6 +426,56 @@ export function AccountDetailScreen() {
               </View>
             ))}
           </View>
+        ) : null}
+
+        {account.custody === "custodial" ? (
+          <>
+            <Text className="mb-3 mt-6 text-[20px] font-extrabold text-white">
+              Custodial signing (testnet)
+            </Text>
+
+            <View className="overflow-hidden rounded-[20px] bg-[#121214] px-4 py-4">
+              <Text className="text-[13px] font-semibold text-[#8E8E92]">
+                Sends a 1 XLM test payment to yourself, signed through Cavos, to
+                verify the custodial signer end-to-end.
+              </Text>
+
+              <Pressable
+                accessibilityLabel="Send test payment"
+                accessibilityRole="button"
+                className="mt-4 self-start rounded-full bg-[#242426] px-4 py-2.5"
+                disabled={signTestPayment.isPending}
+                onPress={() => {
+                  signTestPayment.mutate(account);
+                }}
+              >
+                {signTestPayment.isPending ? (
+                  <View className="flex-row items-center gap-2">
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text className="text-[14px] font-bold text-white">
+                      Sending…
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="text-[14px] font-bold text-white">
+                    Send test payment
+                  </Text>
+                )}
+              </Pressable>
+
+              {signTestPayment.isSuccess ? (
+                <Text className="mt-3 text-[13px] font-semibold text-[#5BED97]">
+                  Signed and submitted via Cavos.
+                </Text>
+              ) : null}
+
+              {signTestPayment.isError ? (
+                <Text className="mt-3 text-[15px] font-semibold text-[#D8D8DC]">
+                  {getTestPaymentErrorMessage(signTestPayment.error)}
+                </Text>
+              ) : null}
+            </View>
+          </>
         ) : null}
       </ScrollView>
     </View>

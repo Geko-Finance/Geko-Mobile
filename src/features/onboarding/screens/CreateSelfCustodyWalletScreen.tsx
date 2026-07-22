@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { fundTestnetAccount } from "@/src/services/api/stellar/friendbot";
 import { deviceBiometricAuthorizer } from "@/src/services/wallet/biometric-authorizer";
 import {
@@ -27,6 +28,7 @@ const VERIFY_WORD_INDEXES = [2, 6, 10] as const;
 export function CreateSelfCustodyWalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
   const networkId = useActiveNetworkId();
   const addAccount = useWalletStore((state) => state.addAccount);
   const accounts = useWalletStore((state) => state.accounts);
@@ -69,7 +71,7 @@ export function CreateSelfCustodyWalletScreen() {
   };
 
   const finishBackup = async () => {
-    if (material === null) {
+    if (material === null || session === null) {
       return;
     }
 
@@ -92,6 +94,7 @@ export function CreateSelfCustodyWalletScreen() {
         custody: "non_custodial",
         id: material.publicKey,
         name: name.trim() || "My wallet",
+        ownerUserId: session.user.id,
         publicKey: material.publicKey,
       });
 

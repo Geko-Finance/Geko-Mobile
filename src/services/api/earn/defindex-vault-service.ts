@@ -11,11 +11,11 @@ function toContractSignTransaction(
   networkPassphrase: string
 ): SignTransaction {
   return async (transactionXdr, options) => {
-    const signedTxXdr = await signer.signTransaction(transactionXdr, {
+    const { xdr } = await signer.signTransaction(transactionXdr, {
       networkPassphrase: options?.networkPassphrase ?? networkPassphrase,
     });
 
-    return { signedTxXdr };
+    return { signedTxXdr: xdr };
   };
 }
 
@@ -46,6 +46,16 @@ export async function depositToVault(
   input: DepositToVaultInput,
   signer: WalletSigner
 ): Promise<DepositToVaultResult> {
+  if (signer.custody === "custodial") {
+    // Cavos's WalletSigner only supports signing single native-XLM-payment operations (see
+    // CavosSigner.signTransaction) and submits as a side effect of "signing" — it cannot sign a
+    // Soroban invokeHostFunction call like a vault deposit, and this flow's own submit step
+    // (assembled.signAndSend below) would conflict with Cavos's atomic sign-and-submit anyway.
+    throw new Error(
+      "Vault deposits need a non-custodial signer; Cavos only supports native XLM payments."
+    );
+  }
+
   const network = getActiveStellarNetwork();
 
   if (network.rpcUrl === undefined) {

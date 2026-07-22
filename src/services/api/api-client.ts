@@ -35,7 +35,7 @@ export async function apiRequest<TResponse, TBody = unknown>(
   if (options.requiresAuth) {
     const session = await getStoredSession();
 
-    if (!session) {
+    if (!session || !session.tokens) {
       clearTimeout(timeout);
       throw new ApiError("Authentication required", 401);
     }

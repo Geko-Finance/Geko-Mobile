@@ -37,6 +37,9 @@ export const STELLAR_NETWORKS: Record<StellarNetworkId, StellarNetworkConfig> = 
     id: "mainnet",
     horizonUrl: "https://horizon.stellar.org",
     networkPassphrase: PUBLIC_NETWORK_PASSPHRASE,
+    // Public provider from https://developers.stellar.org/docs/data/apis/rpc/providers;
+    // swap for a dedicated/paid provider before real mainnet traffic.
+    rpcUrl: "https://mainnet.sorobanrpc.com",
   },
 };
 

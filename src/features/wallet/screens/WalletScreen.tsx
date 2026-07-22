@@ -17,6 +17,8 @@ import {
   makeWatchOnlyAccount,
 } from "@/src/domain/wallet";
 import type { StellarNetworkId, WalletCustody } from "@/src/domain/wallet";
+import { useSession } from "@/src/features/auth/session/SessionProvider";
+import { BackButton } from "@/src/features/shared/components/BackButton";
 import {
   useActiveNetworkId,
   useCreateTestWallet,
@@ -50,6 +52,7 @@ function formatCustodyLabel(custody: WalletCustody): string {
 export function WalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
   const accounts = useWalletAccounts();
   const activeAccountId = useWalletStore((state) => state.activeAccountId);
   const addAccount = useWalletStore((state) => state.addAccount);
@@ -67,6 +70,10 @@ export function WalletScreen() {
     (createTestWallet.isError ? createTestWallet.error.message : null);
 
   const handleWatchAddress = () => {
+    if (session === null) {
+      return;
+    }
+
     createTestWallet.reset();
     const key = publicKey.trim();
 
@@ -82,7 +89,9 @@ export function WalletScreen() {
       return;
     }
 
-    addAccount(makeWatchOnlyAccount(name.trim() || "Watched wallet", key));
+    addAccount(
+      makeWatchOnlyAccount(name.trim() || "Watched wallet", key, session.user.id)
+    );
     setName("");
     setPublicKey("");
     setValidationError(null);
@@ -109,6 +118,9 @@ export function WalletScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <View className="mb-2">
+          <BackButton />
+        </View>
         <Text className="text-[13px] font-bold uppercase tracking-wide text-[#8E8E92]">
           WALLET
         </Text>
@@ -272,9 +284,20 @@ export function WalletScreen() {
           ) : null}
 
           <Pressable
-            accessibilityLabel="Watch address"
+            accessibilityLabel="Create wallet without a seed phrase"
             accessibilityRole="button"
             className="mt-4 self-start rounded-full bg-[#242426] px-4 py-2.5"
+            onPress={() => router.push("/onboarding/custodial")}
+          >
+            <Text className="text-[14px] font-bold text-white">
+              Create wallet without a seed phrase
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Watch address"
+            accessibilityRole="button"
+            className="mt-3 self-start rounded-full bg-[#242426] px-4 py-2.5"
             onPress={handleWatchAddress}
           >
             <Text className="text-[14px] font-bold text-white">

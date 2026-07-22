@@ -3,22 +3,26 @@ import {
   Bell,
   ChevronDown,
   CircleDollarSign,
-  PiggyBank,
-  Repeat2,
   Send,
 } from "lucide-react-native";
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { canSend } from "@/src/domain/wallet";
+import { GekoIcon } from "@/src/features/home/components/GekoIcon";
 import {
   CARD_ASSETS,
   FinanceCard,
 } from "@/src/features/home/components/FinanceCard";
 import { QuickAction } from "@/src/features/home/components/QuickAction";
 import { TransactionRow } from "@/src/features/home/components/TransactionRow";
-import { GekoIcon } from "@/src/features/home/components/GekoIcon";
+import {
+  useAccountBalances,
+  useAccountTransactions,
+} from "@/src/features/wallet/api/wallet-queries";
+import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 
 type TransactionPeriod = "today" | "week" | "month";
 
@@ -28,86 +32,17 @@ const PERIOD_OPTIONS: { label: string; value: TransactionPeriod }[] = [
   { label: "Month", value: "month" },
 ];
 
-const TRANSACTIONS = [
-  {
-    amount: "+$30,00",
-    amountTone: "green" as const,
-    icon: Repeat2,
-    meta: "Today - 6:22 AM",
-    period: "today" as const,
-    title: "Jose Sanchez",
-  },
-  {
-    amount: "$450,00",
-    amountTone: "yellow" as const,
-    icon: PiggyBank,
-    meta: "Yesterday - 12:31 PM",
-    period: "week" as const,
-    title: "Mexico Trip Budget",
-  },
-  {
-    amount: "-$145,00",
-    amountTone: "red" as const,
-    icon: Repeat2,
-    meta: "Nov 9 - 15:01 PM",
-    period: "week" as const,
-    title: "Christmas Gift",
-  },
-  {
-    amount: "+$50,00",
-    amountTone: "green" as const,
-    icon: Send,
-    meta: "Nov 4 - 12:31 PM",
-    period: "week" as const,
-    title: "Salary Bonus",
-  },
-  {
-    amount: "+$150,00",
-    amountTone: "green" as const,
-    icon: ArrowDown,
-    meta: "Nov 2 - 9:15 AM",
-    period: "month" as const,
-    title: "Freelance Project",
-  },
-  {
-    amount: "-$32,80",
-    amountTone: "red" as const,
-    icon: CircleDollarSign,
-    meta: "Oct 31 - 8:04 PM",
-    period: "month" as const,
-    title: "Coffee & Snacks",
-  },
-  {
-    amount: "+$920,00",
-    amountTone: "green" as const,
-    icon: ArrowDown,
-    meta: "Oct 29 - 10:00 AM",
-    period: "month" as const,
-    title: "Payroll Deposit",
-  },
-  {
-    amount: "$120,00",
-    amountTone: "yellow" as const,
-    icon: PiggyBank,
-    meta: "Oct 26 - 2:45 PM",
-    period: "month" as const,
-    title: "Emergency Fund",
-  },
-  {
-    amount: "-$76,10",
-    amountTone: "red" as const,
-    icon: Send,
-    meta: "Oct 22 - 7:18 PM",
-    period: "month" as const,
-    title: "Dinner Transfer",
-  },
-];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const activeAccount = useActiveAccount();
+  const balances = useAccountBalances(activeAccount?.publicKey);
+  const transactions = useAccountTransactions(activeAccount?.publicKey);
   const [selectedPeriod, setSelectedPeriod] =
     useState<TransactionPeriod>("month");
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const stickyOpacity = useMemo(
     () =>
@@ -134,21 +69,67 @@ export function HomeScreen() {
       }),
     [scrollY]
   );
-  const visibleTransactions = useMemo(
-    () =>
-      TRANSACTIONS.filter((transaction) => {
-        if (selectedPeriod === "month") {
-          return true;
+  const formattedBalance = useMemo(() => {
+    const nativeBalance = balances.data?.find((b) => b.asset.type === "native");
+
+    if (nativeBalance === undefined) {
+      return "0.00 XLM";
+    }
+
+    return `${Number(nativeBalance.amount).toFixed(2)} XLM`;
+  }, [balances.data]);
+  const otherBalances = (balances.data ?? []).filter(
+    (b) => b.asset.type !== "native"
+  );
+
+  const ownerName = activeAccount?.name ?? "Wallet";
+
+  const visibleTransactions = useMemo(() => {
+    const entries = transactions.data ?? [];
+    const now = Date.now();
+
+    return entries
+      .filter((entry) => {
+        const age = now - new Date(entry.createdAt).getTime();
+
+        if (selectedPeriod === "today") {
+          return age < DAY_MS;
         }
 
         if (selectedPeriod === "week") {
-          return transaction.period === "today" || transaction.period === "week";
+          return age < 7 * DAY_MS;
         }
 
-        return transaction.period === "today";
-      }),
-    [selectedPeriod]
-  );
+        return age < 30 * DAY_MS;
+      })
+      .map((entry) => {
+        const isReceived = entry.type === "received";
+        const createdAt = new Date(entry.createdAt);
+
+        return {
+          id: entry.id,
+          amount: `${isReceived ? "+" : "-"}${Number(entry.amountXlm).toFixed(2)} XLM`,
+          amountTone: isReceived ? ("green" as const) : ("red" as const),
+          icon: isReceived ? ArrowDown : Send,
+          meta: `${createdAt.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })} · ${createdAt.toLocaleTimeString(undefined, {
+            hour: "numeric",
+            minute: "2-digit",
+          })}`,
+          title: `${entry.counterparty.slice(0, 4)}...${entry.counterparty.slice(-4)}`,
+        };
+      });
+  }, [selectedPeriod, transactions.data]);
+
+  if (activeAccount === null) {
+    return (
+      <View className="flex-1 items-center justify-center bg-black">
+        <Text className="text-white">No wallet connected.</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-black">
@@ -169,10 +150,10 @@ export function HomeScreen() {
         />
         <View className="ml-3 flex-1">
           <Text className="text-[15px] font-extrabold text-white">
-            Jonathan Doe
+            {ownerName}
           </Text>
           <Text className="mt-0.5 text-[13px] font-semibold text-white/55">
-            Balance $6,480.00
+            Balance {formattedBalance}
           </Text>
         </View>
         <View className="rounded-full bg-[#123B2B] px-3 py-1.5">
@@ -200,13 +181,58 @@ export function HomeScreen() {
           <Bell color="#8E8E92" fill="#8E8E92" size={25} strokeWidth={2.5} />
         </View>
 
-        <FinanceCard balance="$6,480.00" color="blue" owner="Jonathan Doe" />
+        <FinanceCard balance={formattedBalance} color="blue" owner={ownerName} />
 
-        <View className="mt-4 flex-row gap-2.5">
-          <QuickAction icon={Send} label="Send" />
-          <QuickAction icon={ArrowDown} label="Receive" />
-          <QuickAction icon={CircleDollarSign} label="Buy & Sell" />
+        <View className="mt-4">
+          <View className="flex-row gap-2.5">
+            <QuickAction
+              disabled={!canSend(activeAccount)}
+              icon={Send}
+              label="Send"
+              onPress={() => router.push("/payments/send-options")}
+            />
+            <QuickAction
+              icon={ArrowDown}
+              label="Receive"
+              onPress={() => router.push("/payments/receive")}
+            />
+            <QuickAction
+              icon={CircleDollarSign}
+              label="Buy & Sell"
+              onPress={() => setShowComingSoon(true)}
+            />
+          </View>
+          {showComingSoon ? (
+            <Pressable
+              className="mt-2 rounded-xl bg-[#1E1E20] px-4 py-3"
+              onPress={() => setShowComingSoon(false)}
+            >
+              <Text className="text-[13px] font-semibold text-[#8E8E92]">
+                Buy & Sell is coming soon.
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
+
+        {otherBalances.length > 0 ? (
+          <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214]">
+            {otherBalances.map((balance, index) => (
+              <View
+                key={balance.asset.id}
+                className={`flex-row items-center justify-between px-4 py-3 ${
+                  index < otherBalances.length - 1 ? "border-b border-[#1E1E20]" : ""
+                }`}
+              >
+                <Text className="text-[15px] font-bold text-white">
+                  {balance.asset.code}
+                </Text>
+                <Text className="text-[15px] font-semibold text-[#8E8E92]">
+                  {Number(balance.amount).toFixed(2)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View className="mt-6 flex-row items-center justify-between">
           <Text className="text-[29px] font-extrabold text-[#A6A6A8]">
@@ -247,12 +273,13 @@ export function HomeScreen() {
         </View>
 
         <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214] pb-24">
-          {visibleTransactions.map((transaction) => (
-            <TransactionRow
-              key={`${transaction.meta}-${transaction.title}`}
-              {...transaction}
-            />
-          ))}
+          {transactions.isLoading ? null : visibleTransactions.length === 0 ? (
+            <Text className="px-4 py-6 text-[#8E8E92]">No transactions yet.</Text>
+          ) : (
+            visibleTransactions.map((transaction) => (
+              <TransactionRow key={transaction.id} {...transaction} />
+            ))
+          )}
         </View>
       </Animated.ScrollView>
     </View>

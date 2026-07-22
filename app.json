@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.gekomobile.gekomobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Use Face ID to protect wallet signing and recovery details."
       }
     },
     "android": {
@@ -45,6 +46,7 @@
       "expo-font",
       "expo-localization",
       "expo-secure-store",
+      "expo-local-authentication",
       "expo-web-browser"
     ],
     "experiments": {

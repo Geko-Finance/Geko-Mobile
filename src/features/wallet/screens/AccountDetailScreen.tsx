@@ -1,5 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Account,
+  Asset,
+  Keypair,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-base";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { isNativeAsset } from "@/src/domain/wallet";
@@ -16,6 +31,14 @@ import {
   useWalletAccounts,
   useWalletStore,
 } from "@/src/features/wallet/state/wallet-store";
+import { appConfig } from "@/src/config/env";
+import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
+import { LocalSigner } from "@/src/services/wallet/local-signer";
+import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
+import {
+  revealLocalWalletRecovery,
+  type RevealedRecovery,
+} from "@/src/services/wallet/local-wallet-service";
 
 function formatPublicKey(publicKey: string): string {
   return `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`;
@@ -47,13 +70,21 @@ function formatNetworkLabel(networkId: StellarNetworkId): string {
 }
 
 export function AccountDetailScreen() {
-  const { accountId } = useLocalSearchParams<{ accountId: string }>();
+  const { accountId, funding } = useLocalSearchParams<{
+    accountId: string;
+    funding?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const account = useWalletAccount(accountId);
   const accounts = useWalletAccounts();
   const setActiveAccount = useWalletStore((state) => state.setActiveAccount);
   const networkId = useActiveNetworkId();
+  const [walletPin, setWalletPin] = useState("");
+  const [recovery, setRecovery] = useState<RevealedRecovery | null>(null);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [securityStatus, setSecurityStatus] = useState<string | null>(null);
+  const [isSecurityWorking, setIsSecurityWorking] = useState(false);
   const {
     data: balances,
     error,
@@ -73,6 +104,78 @@ export function AccountDetailScreen() {
   }
 
   const networkLabel = formatNetworkLabel(networkId);
+
+  const revealRecovery = async () => {
+    setSecurityError(null);
+    setSecurityStatus(null);
+    setIsSecurityWorking(true);
+    try {
+      const revealed = await revealLocalWalletRecovery(
+        account.publicKey,
+        walletPin
+      );
+      setRecovery(revealed);
+      setWalletPin("");
+    } catch (caught) {
+      setSecurityError(getLocalWalletErrorMessage(caught));
+    } finally {
+      setIsSecurityWorking(false);
+    }
+  };
+
+  const verifySigning = async () => {
+    setSecurityError(null);
+    setSecurityStatus(null);
+    setIsSecurityWorking(true);
+    try {
+      const network = getActiveStellarNetwork();
+      const transaction = new TransactionBuilder(
+        new Account(account.publicKey, "0"),
+        {
+          fee: "100",
+          networkPassphrase: network.networkPassphrase,
+        }
+      )
+        .addOperation(
+          Operation.payment({
+            amount: "0.0000001",
+            asset: Asset.native(),
+            destination: account.publicKey,
+          })
+        )
+        .setTimeout(30)
+        .build();
+      const signer = new LocalSigner({
+        pinProvider: async () => walletPin,
+        publicKey: account.publicKey,
+      });
+      const signedXdr = await signer.signTransaction(transaction.toXDR(), {
+        networkPassphrase: network.networkPassphrase,
+      });
+      const signed = TransactionBuilder.fromXDR(
+        signedXdr,
+        network.networkPassphrase
+      );
+
+      const signature = signed.signatures[0]?.signature();
+      if (
+        signature === undefined ||
+        !Keypair.fromPublicKey(account.publicKey).verify(
+          signed.hash(),
+          signature
+        )
+      ) {
+        throw new Error("Signature verification failed.");
+      }
+
+      setWalletPin("");
+      setSecurityStatus("Offline signing check passed. Nothing was submitted.");
+    } catch (caught) {
+      setSecurityError(getLocalWalletErrorMessage(caught));
+    } finally {
+      setIsSecurityWorking(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-black">
@@ -111,6 +214,81 @@ export function AccountDetailScreen() {
             {formatPublicKey(account.publicKey)}
           </Text>
         </View>
+
+        {funding === "failed" ? (
+          <View className="mt-4 rounded-[16px] border border-[#6E5520] bg-[#2B2312] px-4 py-4">
+            <Text className="text-[14px] font-semibold text-[#FFCC66]">
+              Your wallet is safely stored, but Friendbot could not fund it. You can retry by funding this public key later.
+            </Text>
+          </View>
+        ) : null}
+
+        {account.custody === "non_custodial" ? (
+          <View className="mt-4 rounded-[20px] bg-[#121214] p-4">
+            <Text className="text-[18px] font-extrabold text-white">Wallet security</Text>
+            <Text className="mt-1 text-[13px] leading-5 text-[#8E8E92]">
+              Enter your six-digit wallet PIN. Biometrics are required after you choose a protected action.
+            </Text>
+            <TextInput
+              className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3 text-white"
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="Wallet PIN"
+              placeholderTextColor="#6E6E72"
+              secureTextEntry
+              value={walletPin}
+              onChangeText={setWalletPin}
+            />
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              <Pressable
+                accessibilityRole="button"
+                className="rounded-full bg-[#242426] px-4 py-2.5"
+                disabled={isSecurityWorking || walletPin.length !== 6}
+                onPress={() => void revealRecovery()}
+              >
+                <Text className="text-[14px] font-bold text-white">Reveal recovery</Text>
+              </Pressable>
+              {appConfig.environment === "development" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  className="rounded-full bg-[#242426] px-4 py-2.5"
+                  disabled={isSecurityWorking || walletPin.length !== 6}
+                  onPress={() => void verifySigning()}
+                >
+                  <Text className="text-[14px] font-bold text-white">Test signing</Text>
+                </Pressable>
+              ) : null}
+              {isSecurityWorking ? <ActivityIndicator color="#FFFFFF" /> : null}
+            </View>
+            {recovery !== null ? (
+              <View className="mt-4 rounded-xl border border-[#6E5520] bg-[#2B2312] p-3">
+                <Text className="text-[12px] font-bold uppercase text-[#FFCC66]">
+                  {recovery.kind === "mnemonic" ? "Recovery phrase" : "Secret key"}
+                </Text>
+                <Text selectable className="mt-2 text-[15px] leading-6 text-white">
+                  {recovery.value}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  className="mt-3 self-start"
+                  onPress={() => setRecovery(null)}
+                >
+                  <Text className="font-bold text-[#FFCC66]">Hide</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {securityStatus !== null ? (
+              <Text className="mt-3 text-[13px] font-semibold text-[#5BED97]">
+                {securityStatus}
+              </Text>
+            ) : null}
+            {securityError !== null ? (
+              <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
+                {securityError}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <Text className="mb-3 mt-6 text-[15px] font-bold text-[#8E8E92]">
           Accounts

@@ -18,6 +18,8 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="wallet/index" />
       <Stack.Screen name="wallet/[accountId]" />
+      <Stack.Screen name="wallet/create" />
+      <Stack.Screen name="wallet/import" />
       <Stack.Screen name="payments/send" />
       <Stack.Screen name="payments/confirm" />
       <Stack.Screen name="payments/success" />

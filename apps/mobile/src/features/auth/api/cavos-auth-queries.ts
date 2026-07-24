@@ -7,9 +7,9 @@ import {
   getOAuthUrl,
   sendOtp,
   verifyOtp,
+  type AuthSessionResult,
   type OAuthProvider,
-  type ResolvedAuthIdentity,
-} from "@/src/services/api/cavos-auth/cavos-auth-client";
+} from "@/src/features/auth/api/auth-client";
 
 export class OAuthCancelledError extends Error {
   constructor() {
@@ -31,10 +31,10 @@ export function useVerifyOtp() {
   });
 }
 
-/** Opens the Cavos-hosted Google/Apple sign-in page and resolves once the user completes it. */
+/** Opens the hosted Google/Apple sign-in page and resolves once the user completes it. */
 export function useSocialLogin(provider: OAuthProvider) {
   return useMutation({
-    mutationFn: async (): Promise<ResolvedAuthIdentity> => {
+    mutationFn: async (): Promise<AuthSessionResult> => {
       const redirectUri = Linking.createURL("auth-callback");
       const url = await getOAuthUrl(provider, redirectUri);
       const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
@@ -43,7 +43,7 @@ export function useSocialLogin(provider: OAuthProvider) {
         throw new OAuthCancelledError();
       }
 
-      return completeOAuthCallback(result.url);
+      return completeOAuthCallback(result.url, provider);
     },
   });
 }

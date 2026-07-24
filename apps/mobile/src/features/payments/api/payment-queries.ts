@@ -5,14 +5,17 @@ import {
   useActiveNetworkId,
   walletKeys,
 } from "@/src/features/wallet/api/wallet-queries";
-import { CavosSessionExpiredError } from "@/src/services/api/cavos/cavos-errors";
 import { getCavosClient } from "@/src/services/api/cavos/cavos-client";
-import { getStoredCavosSession } from "@/src/services/api/cavos/cavos-session-storage";
 import { CavosSigner } from "@/src/services/api/cavos/cavos-signer";
 import { submitSignedTransaction } from "@/src/services/api/stellar/horizon-submit";
 import { buildNativePaymentXdr } from "@/src/services/api/stellar/payment-xdr";
 import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
 import { fetchAccountSequence } from "@/src/services/api/stellar/stellar-sequence";
+import { buildChangeTrustXdr } from "@/src/services/api/stellar/trustline-xdr";
+import {
+  LocalSigner,
+  type WalletPinProvider,
+} from "@/src/services/wallet/local-signer";
 
 export function useSendPayment() {
   const queryClient = useQueryClient();
@@ -25,17 +28,10 @@ export function useSendPayment() {
       amountXlm: string;
       asset?: { code: string; issuer: string };
       memo?: string;
+      pinProvider?: WalletPinProvider;
     }): Promise<{ hash?: string }> => {
       if (!canSend(input.account)) {
         throw new Error("This account cannot send payments");
-      }
-
-      const session = await getStoredCavosSession();
-
-      if (session === null || session.address !== input.account.publicKey) {
-        throw new CavosSessionExpiredError(
-          "No active Cavos session for this account; reconnect to continue",
-        );
       }
 
       const { networkPassphrase } = getActiveStellarNetwork();
@@ -50,8 +46,28 @@ export function useSendPayment() {
         memo: input.memo,
       });
 
+      if (input.account.custody === "non_custodial") {
+        if (input.pinProvider === undefined) {
+          throw new Error("Wallet PIN is required to sign this payment");
+        }
+
+        const signer = new LocalSigner({
+          pinProvider: input.pinProvider,
+          publicKey: input.account.publicKey,
+        });
+        const { xdr: signedXdr } = await signer.signTransaction(unsignedXdr, {
+          networkPassphrase,
+        });
+        const { hash } = await submitSignedTransaction(signedXdr);
+
+        return { hash };
+      }
+
       if (input.asset === undefined) {
-        const signer = new CavosSigner(session);
+        const signer = new CavosSigner(
+          input.account.id,
+          input.account.publicKey,
+        );
         const result = await signer.signTransaction(unsignedXdr, {
           networkPassphrase,
         });
@@ -59,7 +75,10 @@ export function useSendPayment() {
         return { hash: result.hash };
       }
 
-      const { signedXdr } = await getCavosClient().signXdr(session, unsignedXdr);
+      const { signedXdr } = await getCavosClient().signXdr(
+        input.account.id,
+        unsignedXdr,
+      );
       const { hash } = await submitSignedTransaction(signedXdr);
 
       return { hash };
@@ -90,16 +109,38 @@ export function useAddTrustline() {
       account: WalletAccount;
       code: string;
       issuer: string;
+      pinProvider?: WalletPinProvider;
     }): Promise<{ hash: string }> => {
-      const session = await getStoredCavosSession();
+      if (input.account.custody === "non_custodial") {
+        if (input.pinProvider === undefined) {
+          throw new Error("Wallet PIN is required to add a trustline");
+        }
 
-      if (session === null || session.address !== input.account.publicKey) {
-        throw new CavosSessionExpiredError(
-          "No active Cavos session for this account; reconnect to continue",
-        );
+        const { networkPassphrase } = getActiveStellarNetwork();
+        const sequence = await fetchAccountSequence(input.account.publicKey);
+        const unsignedXdr = buildChangeTrustXdr({
+          sourcePublicKey: input.account.publicKey,
+          sourceSequence: sequence,
+          code: input.code,
+          issuer: input.issuer,
+          networkPassphrase,
+        });
+        const signer = new LocalSigner({
+          pinProvider: input.pinProvider,
+          publicKey: input.account.publicKey,
+        });
+        const { xdr: signedXdr } = await signer.signTransaction(unsignedXdr, {
+          networkPassphrase,
+        });
+
+        return submitSignedTransaction(signedXdr);
       }
 
-      return getCavosClient().addTrustline(session, input.code, input.issuer);
+      return getCavosClient().addTrustline(
+        input.account.id,
+        input.code,
+        input.issuer,
+      );
     },
     onSuccess: (_result, input) => {
       queryClient.invalidateQueries({

@@ -1,10 +1,10 @@
 import {
   ImageBackground,
   Pressable,
-  SafeAreaView,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 export function WelcomeScreen() {

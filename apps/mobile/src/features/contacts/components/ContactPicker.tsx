@@ -5,8 +5,8 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-nativ
 import type { Contact } from "@/src/domain/contacts";
 import type { StellarNetworkId } from "@/src/domain/wallet";
 
+import { useContacts } from "../api/contacts-queries";
 import { formatContactAddress } from "../utils/format";
-import { useContacts } from "../state/contacts-store";
 
 export interface ContactPickerProps {
   /** Controls visibility; the caller (e.g. the Send flow) owns this state. */
@@ -19,7 +19,7 @@ export interface ContactPickerProps {
 
 /**
  * Stable recipient-picker API for Send/Swap/CCTP/QR flows to reuse: reads from the shared
- * contacts store, so callers only need to render it and handle `onSelect`.
+ * contacts query cache, so callers only need to render it and handle `onSelect`.
  */
 export function ContactPicker({
   visible,

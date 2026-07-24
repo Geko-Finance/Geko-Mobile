@@ -4,7 +4,8 @@ export type LocalWalletErrorCode =
   | "DUPLICATE_WALLET"
   | "INVALID_PIN"
   | "INVALID_RECOVERY"
-  | "MISSING_KEY";
+  | "MISSING_KEY"
+  | "SYNC_FAILED";
 
 export class LocalWalletError extends Error {
   readonly code: LocalWalletErrorCode;

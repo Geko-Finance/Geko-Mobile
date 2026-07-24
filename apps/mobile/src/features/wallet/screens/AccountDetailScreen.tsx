@@ -80,7 +80,7 @@ function getTestPaymentErrorMessage(error: Error | null): string | null {
     case "CavosProviderUnavailableError":
       return "Cavos is temporarily unavailable - please try again in a moment.";
     case "CavosSessionExpiredError":
-      return "Your Cavos session has expired - recover your wallet again to continue.";
+      return "This device needs approval - enter your recovery code to continue.";
     default:
       return "Something went wrong sending the test payment.";
   }

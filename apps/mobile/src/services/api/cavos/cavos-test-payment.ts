@@ -3,20 +3,10 @@ import { buildNativePaymentXdr } from "@/src/services/api/stellar/payment-xdr";
 import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
 
 import { CavosSigner } from "./cavos-signer";
-import { CavosSessionExpiredError } from "./cavos-errors";
-import { getStoredCavosSession } from "./cavos-session-storage";
 
 export async function signTestCustodialPayment(
   account: WalletAccount,
 ): Promise<void> {
-  const session = await getStoredCavosSession();
-
-  if (session === null || session.address !== account.publicKey) {
-    throw new CavosSessionExpiredError(
-      "No active Cavos session for this account; reconnect to continue",
-    );
-  }
-
   const { networkPassphrase } = getActiveStellarNetwork();
   // Sequence "0" is safe here only because Cavos execute() ignores the passed sequence
   // and builds its own tx internally from amount+destination.
@@ -28,6 +18,6 @@ export async function signTestCustodialPayment(
     networkPassphrase,
   });
 
-  const signer = new CavosSigner(session);
+  const signer = new CavosSigner(account.id, account.publicKey);
   await signer.signTransaction(unsignedXdr, { networkPassphrase });
 }

@@ -18,17 +18,8 @@ import {
   CavosSessionExpiredError,
   CavosUnsupportedOperationError,
 } from "./cavos-errors";
-import type { CavosSession } from "./cavos-types";
 
 const STROOPS_PER_XLM = 10_000_000n;
-
-const assertSessionReady = (session: CavosSession): void => {
-  if (session.status !== "ready") {
-    throw new CavosSessionExpiredError(
-      "Cavos session is no longer valid; reconnect to continue",
-    );
-  }
-};
 
 const xlmAmountToStroops = (amount: string): bigint => {
   const [whole = "0", fraction = ""] = amount.split(".");
@@ -96,22 +87,26 @@ const parseNativePayment = (
 export class CavosSigner implements WalletSigner {
   readonly custody = "custodial" as const;
 
-  private readonly session: CavosSession;
+  private readonly walletId: string;
+  private readonly publicAddress: string;
   private readonly client: CavosClient;
 
-  constructor(session: CavosSession, client: CavosClient = getCavosClient()) {
-    this.session = session;
+  constructor(
+    walletId: string,
+    publicAddress: string,
+    client: CavosClient = getCavosClient(),
+  ) {
+    this.walletId = walletId;
+    this.publicAddress = publicAddress;
     this.client = client;
   }
 
   async getAddress(): Promise<string> {
-    assertSessionReady(this.session);
-    return this.session.address;
+    return this.publicAddress;
   }
 
   async getPublicKey(): Promise<string> {
-    assertSessionReady(this.session);
-    return this.session.address;
+    return this.publicAddress;
   }
 
   /**
@@ -133,8 +128,6 @@ export class CavosSigner implements WalletSigner {
     transactionXdr: string,
     options: SignTransactionOptions,
   ): Promise<SignTransactionResult> {
-    assertSessionReady(this.session);
-
     const { amountStroops, destination } = parseNativePayment(
       transactionXdr,
       options.networkPassphrase,
@@ -142,8 +135,15 @@ export class CavosSigner implements WalletSigner {
 
     let result;
     try {
-      result = await this.client.execute(this.session, amountStroops, destination);
-    } catch {
+      result = await this.client.execute(
+        this.walletId,
+        amountStroops,
+        destination,
+      );
+    } catch (error) {
+      if (error instanceof CavosSessionExpiredError) {
+        throw error;
+      }
       throw new CavosProviderUnavailableError("Cavos provider is unavailable");
     }
 

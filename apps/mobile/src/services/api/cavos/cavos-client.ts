@@ -1,241 +1,194 @@
-import { appConfig } from "@/src/config/env";
+import { apiRequest } from "@/src/services/api/api-client";
+import { ApiError } from "@/src/services/api/api-errors";
 
 import {
   CavosProviderUnavailableError,
   CavosSessionExpiredError,
 } from "./cavos-errors";
 import type {
+  BackendCustodialWallet,
   CavosExecuteResult,
-  CavosIdentity,
-  CavosSession,
 } from "./cavos-types";
 
 /**
- * Internal Cavos wallet-as-a-service port scoped to this MVP.
- * The real `@cavos/kit` SDK runs server-side in server/; this file is an HTTP
- * client to that service, keeping the same port interface for callers.
+ * HTTP client for the JWT-guarded Wallets API (custodial Cavos wallets).
+ * Wallet identity is a stable backend-issued uuid (`wallet.id`), distinct from
+ * the Stellar `publicAddress`. Auth is resolved server-side from the Bearer
+ * token — never pass a userId in the body.
  */
 export interface CavosClient {
-  connect(identity: CavosIdentity): Promise<CavosSession>;
+  createWallet(): Promise<{
+    wallet: BackendCustodialWallet;
+    revealOnce?: { recoveryCode?: string };
+  }>;
+  getWallet(walletId: string): Promise<BackendCustodialWallet>;
   execute(
-    session: CavosSession,
+    walletId: string,
     amountStroops: bigint,
-    destinationPublicKey: string
+    destination: string
   ): Promise<CavosExecuteResult>;
   signXdr(
-    session: CavosSession,
+    walletId: string,
     unsignedXdr: string
   ): Promise<{ signedXdr: string }>;
   addTrustline(
-    session: CavosSession,
+    walletId: string,
     code: string,
     issuer: string
   ): Promise<{ hash: string }>;
-  getRecoveryCode(session: CavosSession): Promise<string | null>;
-  recoverWithCode(identity: CavosIdentity, code: string): Promise<CavosSession>;
-  getBalance(session: CavosSession): Promise<bigint>;
+  recoverDevice(
+    walletId: string,
+    code: string
+  ): Promise<{ status: "ready" }>;
+  getBalance(walletId: string): Promise<bigint>;
 }
 
-const cavosApiUrl = (path: string): string =>
-  `${appConfig.cavosBackendUrl}${path}`;
+/** Maps a 409 (needs device approval) to CavosSessionExpiredError; other failures to provider unavailable. */
+function mapWalletOpError(error: unknown, operation: string): never {
+  if (error instanceof ApiError && error.status === 409) {
+    throw new CavosSessionExpiredError(
+      "Cavos session is no longer valid; reconnect to continue"
+    );
+  }
+
+  throw new CavosProviderUnavailableError(
+    `Cavos ${operation} failed (${
+      error instanceof ApiError ? error.status : "unknown"
+    })`
+  );
+}
 
 const createRealCavosClient = (): CavosClient => ({
-  async connect(identity: CavosIdentity): Promise<CavosSession> {
-    const response = await fetch(cavosApiUrl("/api/cavos/connect"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: identity.userId,
-        email: identity.email,
-      }),
-    });
-
-    if (!response.ok) {
+  async createWallet() {
+    try {
+      return await apiRequest<{
+        wallet: BackendCustodialWallet;
+        revealOnce?: { recoveryCode?: string };
+      }>("/wallets", {
+        method: "POST",
+        body: { custodyType: "cavos_custodial" },
+        requiresAuth: true,
+      });
+    } catch (error) {
       throw new CavosProviderUnavailableError(
-        `Cavos connect failed (${response.status})`
+        `Cavos createWallet failed (${
+          error instanceof ApiError ? error.status : "unknown"
+        })`
       );
     }
+  },
 
-    const { address, status } = (await response.json()) as {
-      address: string;
-      status: CavosSession["status"];
-    };
-
-    return { address, status, userId: identity.userId };
+  async getWallet(walletId: string): Promise<BackendCustodialWallet> {
+    try {
+      return await apiRequest<BackendCustodialWallet>(`/wallets/${walletId}`, {
+        requiresAuth: true,
+      });
+    } catch (error) {
+      throw new CavosProviderUnavailableError(
+        `Cavos getWallet failed (${
+          error instanceof ApiError ? error.status : "unknown"
+        })`
+      );
+    }
   },
 
   async execute(
-    session: CavosSession,
+    walletId: string,
     amountStroops: bigint,
-    destinationPublicKey: string
+    destination: string
   ): Promise<CavosExecuteResult> {
-    const response = await fetch(cavosApiUrl("/api/cavos/execute"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: session.userId,
-        amountStroops: amountStroops.toString(),
-        destination: destinationPublicKey,
-      }),
-    });
-
-    if (response.status === 409) {
-      throw new CavosSessionExpiredError(
-        "Cavos session is no longer valid; reconnect to continue"
+    try {
+      return await apiRequest<CavosExecuteResult>(
+        `/wallets/${walletId}/execute`,
+        {
+          method: "POST",
+          body: {
+            amountStroops: amountStroops.toString(),
+            destination,
+          },
+          requiresAuth: true,
+        }
       );
+    } catch (error) {
+      mapWalletOpError(error, "execute");
     }
-
-    if (!response.ok) {
-      throw new CavosProviderUnavailableError(
-        `Cavos execute failed (${response.status})`
-      );
-    }
-
-    const { hash } = (await response.json()) as { hash: string };
-    return { hash };
   },
 
   async signXdr(
-    session: CavosSession,
+    walletId: string,
     unsignedXdr: string
   ): Promise<{ signedXdr: string }> {
-    const response = await fetch(cavosApiUrl("/api/cavos/sign"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: session.userId,
-        unsignedXdr,
-      }),
-    });
-
-    if (response.status === 409) {
-      throw new CavosSessionExpiredError(
-        "Cavos session is no longer valid; reconnect to continue"
+    try {
+      return await apiRequest<{ signedXdr: string }>(
+        `/wallets/${walletId}/sign`,
+        {
+          method: "POST",
+          body: { unsignedXdr },
+          requiresAuth: true,
+        }
       );
+    } catch (error) {
+      mapWalletOpError(error, "sign");
     }
-
-    if (!response.ok) {
-      throw new CavosProviderUnavailableError(
-        `Cavos sign failed (${response.status})`
-      );
-    }
-
-    const { signedXdr } = (await response.json()) as { signedXdr: string };
-    return { signedXdr };
   },
 
   async addTrustline(
-    session: CavosSession,
+    walletId: string,
     code: string,
     issuer: string
   ): Promise<{ hash: string }> {
-    const response = await fetch(cavosApiUrl("/api/cavos/trustline"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: session.userId,
-        code,
-        issuer,
-      }),
-    });
-
-    if (response.status === 409) {
-      throw new CavosSessionExpiredError(
-        "Cavos session is no longer valid; reconnect to continue"
+    try {
+      return await apiRequest<{ hash: string }>(
+        `/wallets/${walletId}/trustline`,
+        {
+          method: "POST",
+          body: { code, issuer },
+          requiresAuth: true,
+        }
       );
+    } catch (error) {
+      mapWalletOpError(error, "trustline");
     }
-
-    if (!response.ok) {
-      throw new CavosProviderUnavailableError(
-        `Cavos trustline failed (${response.status})`
-      );
-    }
-
-    const { hash } = (await response.json()) as { hash: string };
-    return { hash };
   },
 
-  async getRecoveryCode(session: CavosSession): Promise<string | null> {
-    const response = await fetch(
-      cavosApiUrl(
-        `/api/cavos/recovery-code?userId=${encodeURIComponent(session.userId)}`
-      )
-    );
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (response.status === 409) {
-      throw new CavosSessionExpiredError(
-        "Cavos session is no longer valid; reconnect to continue"
-      );
-    }
-
-    if (!response.ok) {
-      throw new CavosProviderUnavailableError(
-        `Cavos recovery-code fetch failed (${response.status})`
-      );
-    }
-
-    const { code } = (await response.json()) as { code: string };
-    return code;
-  },
-
-  async recoverWithCode(
-    identity: CavosIdentity,
+  async recoverDevice(
+    walletId: string,
     code: string
-  ): Promise<CavosSession> {
-    const response = await fetch(cavosApiUrl("/api/cavos/recover-device"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: identity.userId,
-        code,
-      }),
-    });
-
-    if (!response.ok) {
+  ): Promise<{ status: "ready" }> {
+    try {
+      return await apiRequest<{ status: "ready" }>(
+        `/wallets/${walletId}/recover-device`,
+        {
+          method: "POST",
+          body: { recoveryCode: code },
+          requiresAuth: true,
+        }
+      );
+    } catch (error) {
       throw new CavosProviderUnavailableError(
-        `Cavos device recovery failed (${response.status})`
+        `Cavos device recovery failed (${
+          error instanceof ApiError ? error.status : "unknown"
+        })`
       );
     }
-
-    const { address, status } = (await response.json()) as {
-      address: string;
-      status: CavosSession["status"];
-    };
-
-    return { address, status, userId: identity.userId };
   },
 
-  async getBalance(session: CavosSession): Promise<bigint> {
-    const response = await fetch(
-      cavosApiUrl(
-        `/api/cavos/balance?userId=${encodeURIComponent(session.userId)}`
-      )
-    );
-
-    if (response.status === 409) {
-      throw new CavosSessionExpiredError(
-        "Cavos session is no longer valid; reconnect to continue"
+  async getBalance(walletId: string): Promise<bigint> {
+    try {
+      const { stroops } = await apiRequest<{ stroops: string }>(
+        `/wallets/${walletId}/balance`,
+        { requiresAuth: true }
       );
+      return BigInt(stroops);
+    } catch (error) {
+      mapWalletOpError(error, "balance");
     }
-
-    if (!response.ok) {
-      throw new CavosProviderUnavailableError(
-        `Cavos balance failed (${response.status})`
-      );
-    }
-
-    const { stroops } = (await response.json()) as { stroops: string };
-    return BigInt(stroops);
   },
 });
 
 let cavosClient: CavosClient | undefined;
 
-/** Returns the singleton Cavos client backed by the local Cavos backend service (server/) over HTTP. */
+/** Returns the singleton Cavos Wallets API client (JWT via apiRequest). */
 export function getCavosClient(): CavosClient {
   if (cavosClient === undefined) {
     cavosClient = createRealCavosClient();

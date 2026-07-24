@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { WalletAccount } from "@/src/domain/wallet";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
@@ -25,7 +25,7 @@ function getFriendlyErrorMessage(error: Error | null): string | null {
     case "CavosProviderUnavailableError":
       return "Cavos is temporarily unavailable - please try again in a moment.";
     case "CavosSessionExpiredError":
-      return "Your session has expired - please try again.";
+      return "This device needs approval - please try again.";
     default:
       return "Something went wrong. Please try again.";
   }
@@ -40,7 +40,14 @@ export function CustodialOnboardingScreen() {
 
   const [pendingApprovalAccount, setPendingApprovalAccount] =
     useState<WalletAccount | null>(null);
+  const [revealedRecoveryCode, setRevealedRecoveryCode] = useState<
+    string | null
+  >(null);
   const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+
+  const finishOnboarding = () => {
+    router.replace("/home");
+  };
 
   const connect = () => {
     if (session === null) {
@@ -48,25 +55,30 @@ export function CustodialOnboardingScreen() {
     }
 
     connectCustodialWallet.mutate(
+      { name: session.user.name },
       {
-        identity: { userId: session.user.id, email: session.user.email },
-        name: session.user.name,
-      },
-      {
-        onSuccess: ({ account, needsDeviceApproval }) => {
+        onSuccess: ({ account, needsDeviceApproval, recoveryCode }) => {
+          if (recoveryCode !== undefined) {
+            setRevealedRecoveryCode(recoveryCode);
+            if (needsDeviceApproval) {
+              setPendingApprovalAccount(account);
+            }
+            return;
+          }
+
           if (needsDeviceApproval) {
             setPendingApprovalAccount(account);
             return;
           }
 
-          router.replace("/home");
+          finishOnboarding();
         },
       }
     );
   };
 
-  // Wallet setup is fully automatic once a real Cavos identity exists (this session's
-  // user id/email) - no manual create/recover step needed, connect() covers both.
+  // Wallet setup is fully automatic once the user is authenticated — no manual
+  // create/recover step needed; POST /wallets covers first-time creation.
   useEffect(() => {
     if (hasStartedConnecting.current || session === null) {
       return;
@@ -82,6 +94,16 @@ export function CustodialOnboardingScreen() {
     connect();
   };
 
+  const handleConfirmRecoveryCodeSaved = () => {
+    setRevealedRecoveryCode(null);
+
+    if (pendingApprovalAccount !== null) {
+      return;
+    }
+
+    finishOnboarding();
+  };
+
   const handleApproveDevice = () => {
     if (pendingApprovalAccount === null) {
       return;
@@ -89,13 +111,17 @@ export function CustodialOnboardingScreen() {
 
     recoverWithCode.mutate(
       { account: pendingApprovalAccount, code: recoveryCodeInput.trim() },
-      { onSuccess: () => router.replace("/home") }
+      { onSuccess: () => finishOnboarding() }
     );
   };
 
   const inlineError = connectCustodialWallet.isError
     ? getFriendlyErrorMessage(connectCustodialWallet.error)
     : null;
+
+  const showRecoveryReveal = revealedRecoveryCode !== null;
+  const showDeviceApproval =
+    !showRecoveryReveal && pendingApprovalAccount !== null;
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -121,33 +147,35 @@ export function CustodialOnboardingScreen() {
           secure with Cavos - no seed phrase to write down.
         </Text>
 
-        {pendingApprovalAccount === null ? (
-          <View className="mt-6 items-center overflow-hidden rounded-[20px] bg-[#121214] px-4 py-8">
-            {inlineError !== null ? (
-              <>
-                <Text className="text-center text-[13px] font-semibold text-[#FF6B6B]">
-                  {inlineError}
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  className="mt-4 self-start rounded-full bg-[#242426] px-4 py-2.5"
-                  onPress={handleRetry}
-                >
-                  <Text className="text-[14px] font-bold text-white">
-                    Try again
-                  </Text>
-                </Pressable>
-              </>
-            ) : (
-              <View className="flex-row items-center gap-2">
-                <ActivityIndicator color="#FFFFFF" size="small" />
-                <Text className="text-[14px] font-bold text-white">
-                  Creating your wallet…
-                </Text>
-              </View>
-            )}
+        {showRecoveryReveal ? (
+          <View className="mt-6 overflow-hidden rounded-[20px] bg-[#121214] px-4 py-4">
+            <Text className="text-[16px] font-bold text-white">
+              Save your recovery code
+            </Text>
+            <Text className="mt-2 text-[13px] font-semibold leading-[18px] text-[#8E8E92]">
+              This code is shown only once and can&apos;t be retrieved later.
+              Store it somewhere safe — you&apos;ll need it to approve a new
+              device.
+            </Text>
+            <View className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3">
+              <Text
+                className="text-[15px] font-bold text-white"
+                selectable
+              >
+                {revealedRecoveryCode}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              className="mt-4 self-start rounded-full bg-[#237BFF] px-4 py-2.5"
+              onPress={handleConfirmRecoveryCodeSaved}
+            >
+              <Text className="text-[14px] font-bold text-white">
+                I&apos;ve saved it
+              </Text>
+            </Pressable>
           </View>
-        ) : (
+        ) : showDeviceApproval ? (
           <View className="mt-6 overflow-hidden rounded-[20px] bg-[#121214] px-4 py-4">
             <Text className="text-[16px] font-bold text-white">
               Approve this device
@@ -194,6 +222,32 @@ export function CustodialOnboardingScreen() {
                 </Text>
               )}
             </Pressable>
+          </View>
+        ) : (
+          <View className="mt-6 items-center overflow-hidden rounded-[20px] bg-[#121214] px-4 py-8">
+            {inlineError !== null ? (
+              <>
+                <Text className="text-center text-[13px] font-semibold text-[#FF6B6B]">
+                  {inlineError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  className="mt-4 self-start rounded-full bg-[#242426] px-4 py-2.5"
+                  onPress={handleRetry}
+                >
+                  <Text className="text-[14px] font-bold text-white">
+                    Try again
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <View className="flex-row items-center gap-2">
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text className="text-[14px] font-bold text-white">
+                  Creating your wallet…
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

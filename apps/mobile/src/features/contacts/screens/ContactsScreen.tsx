@@ -6,10 +6,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Contact } from "@/src/domain/contacts";
 import { makeContact } from "@/src/domain/contacts";
 import { isValidStellarAddress } from "@/src/services/api/stellar/address-validation";
+import { ApiError } from "@/src/services/api/api-errors";
 
 import { useActiveNetworkId } from "../../wallet/api/wallet-queries";
+import {
+  useContacts,
+  useCreateContact,
+  useRemoveContact,
+  useToggleFavorite,
+  useUpdateContact,
+} from "../api/contacts-queries";
 import { formatContactAddress } from "../utils/format";
-import { useContacts, useContactsStore } from "../state/contacts-store";
 
 interface ContactFormState {
   label: string;
@@ -25,12 +32,17 @@ function sortContacts(contacts: Contact[]): Contact[] {
   );
 }
 
+function contactAlreadyExistsMessage(): string {
+  return "This address is already saved on this network.";
+}
+
 export function ContactsScreen() {
   const insets = useSafeAreaInsets();
   const contacts = useContacts();
-  const upsertContact = useContactsStore((state) => state.upsertContact);
-  const removeContact = useContactsStore((state) => state.removeContact);
-  const toggleFavorite = useContactsStore((state) => state.toggleFavorite);
+  const createContact = useCreateContact();
+  const updateContact = useUpdateContact();
+  const removeContact = useRemoveContact();
+  const toggleFavorite = useToggleFavorite();
   const networkId = useActiveNetworkId();
 
   const [query, setQuery] = useState("");
@@ -73,7 +85,7 @@ export function ContactsScreen() {
       { text: "Cancel", style: "cancel" },
       {
         onPress: () => {
-          removeContact(contact.id);
+          removeContact.mutate(contact.id);
           if (editingContact?.id === contact.id) {
             resetForm();
           }
@@ -84,9 +96,10 @@ export function ContactsScreen() {
     ]);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const label = form.label.trim();
     const address = form.address.trim();
+    const network = editingContact?.network ?? networkId;
 
     if (label === "") {
       setValidationError("Give this contact a name.");
@@ -99,7 +112,10 @@ export function ContactsScreen() {
     }
 
     const duplicate = contacts.find(
-      (entry) => entry.address === address && entry.id !== editingContact?.id
+      (entry) =>
+        entry.address === address &&
+        entry.network === network &&
+        entry.id !== editingContact?.id
     );
 
     if (duplicate !== undefined) {
@@ -107,21 +123,34 @@ export function ContactsScreen() {
       return;
     }
 
-    const contact = makeContact({
-      address,
-      createdAt: editingContact?.createdAt,
-      favorite: editingContact?.favorite,
-      label,
-      memo: form.memo,
-      network: editingContact?.network ?? networkId,
-    });
+    try {
+      if (editingContact !== null) {
+        await updateContact.mutateAsync({
+          address,
+          id: editingContact.id,
+          label,
+          memo: form.memo,
+        });
+      } else {
+        await createContact.mutateAsync(
+          makeContact({
+            address,
+            label,
+            memo: form.memo,
+            network: networkId,
+          })
+        );
+      }
 
-    if (editingContact !== null && editingContact.id !== contact.id) {
-      removeContact(editingContact.id);
+      resetForm();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setValidationError(contactAlreadyExistsMessage());
+        return;
+      }
+
+      throw error;
     }
-
-    upsertContact(contact);
-    resetForm();
   };
 
   return (
@@ -190,7 +219,7 @@ export function ContactsScreen() {
                   accessibilityRole="button"
                   className="px-3 py-4"
                   hitSlop={8}
-                  onPress={() => toggleFavorite(contact.id)}
+                  onPress={() => toggleFavorite.mutate(contact.id)}
                 >
                   <Star
                     color={contact.favorite ? "#5BED97" : "#8E8E92"}

@@ -19,7 +19,11 @@ import {
   storeLocalWalletMaterial,
   type LocalWalletMaterial,
 } from "@/src/services/wallet/local-wallet-service";
-import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
+import {
+  getLocalWalletErrorMessage,
+  LocalWalletError,
+} from "@/src/services/wallet/local-wallet-errors";
+import { registerNonCustodialWallet } from "@/src/services/wallet/register-non-custodial-wallet";
 import { useActiveNetworkId } from "@/src/features/wallet/api/wallet-queries";
 import { useWalletStore } from "@/src/features/wallet/state/wallet-store";
 
@@ -88,15 +92,27 @@ export function CreateSelfCustodyWalletScreen() {
     setError(null);
     setIsWorking(true);
     try {
-      await storeLocalWalletMaterial(material, pin);
-      addAccount({
-        createdAt: new Date().toISOString(),
-        custody: "non_custodial",
-        id: material.publicKey,
-        name: name.trim() || "My wallet",
-        ownerUserId: session.user.id,
-        publicKey: material.publicKey,
-      });
+      try {
+        await storeLocalWalletMaterial(material, pin);
+      } catch (caught) {
+        // Keys may already be on-device from a prior attempt that failed at backend sync.
+        if (
+          !(caught instanceof LocalWalletError && caught.code === "DUPLICATE_WALLET")
+        ) {
+          throw caught;
+        }
+      }
+      await registerNonCustodialWallet(material.publicKey);
+      if (!accounts.some((account) => account.id === material.publicKey)) {
+        addAccount({
+          createdAt: new Date().toISOString(),
+          custody: "non_custodial",
+          id: material.publicKey,
+          name: name.trim() || "My wallet",
+          ownerUserId: session.user.id,
+          publicKey: material.publicKey,
+        });
+      }
 
       let fundingFailed = false;
       if (networkId === "testnet") {

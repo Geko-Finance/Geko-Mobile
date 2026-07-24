@@ -21,6 +21,9 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Turborepo
+.turbo/
+
 # debug
 npm-debug.*
 yarn-debug.*
@@ -39,5 +42,5 @@ yarn-error.*
 app-example
 
 # generated native folders
-/ios
-/android
+apps/mobile/ios
+apps/mobile/android

@@ -1,14 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import type { PendingProposal } from "@/src/domain/multisig";
 import { canSend, type WalletAccount } from "@/src/domain/wallet";
 import {
   useActiveNetworkId,
   walletKeys,
 } from "@/src/features/wallet/api/wallet-queries";
+import { proposeOperation } from "@/src/features/multisig/api/propose-flow";
 import { getCavosClient } from "@/src/services/api/cavos/cavos-client";
 import { CavosSigner } from "@/src/services/api/cavos/cavos-signer";
 import { submitSignedTransaction } from "@/src/services/api/stellar/horizon-submit";
 import { buildNativePaymentXdr } from "@/src/services/api/stellar/payment-xdr";
+import { getStellarClient } from "@/src/services/api/stellar/stellar-client";
 import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
 import { fetchAccountSequence } from "@/src/services/api/stellar/stellar-sequence";
 import { buildChangeTrustXdr } from "@/src/services/api/stellar/trustline-xdr";
@@ -29,7 +32,7 @@ export function useSendPayment() {
       asset?: { code: string; issuer: string };
       memo?: string;
       pinProvider?: WalletPinProvider;
-    }): Promise<{ hash?: string }> => {
+    }): Promise<{ hash?: string; proposal?: PendingProposal }> => {
       if (!canSend(input.account)) {
         throw new Error("This account cannot send payments");
       }
@@ -51,16 +54,26 @@ export function useSendPayment() {
           throw new Error("Wallet PIN is required to sign this payment");
         }
 
-        const signer = new LocalSigner({
-          pinProvider: input.pinProvider,
-          publicKey: input.account.publicKey,
-        });
-        const { xdr: signedXdr } = await signer.signTransaction(unsignedXdr, {
+        // Every non-custodial payment looks up the account's current signers/thresholds
+        // first - a real Horizon round-trip, unavoidable since we can't know whether this
+        // payment can execute alone or needs co-signers without it. For a regular (never
+        // multisig-enabled) account, its default thresholds are met by the master key's own
+        // signature alone, so proposeOperation submits immediately here exactly as before.
+        const multisigAccount = await getStellarClient().fetchMultisigAccount(
+          input.account.publicKey,
+        );
+        const outcome = await proposeOperation({
+          account: multisigAccount,
+          operationKind: "payment",
+          unsignedXdr,
           networkPassphrase,
+          ownerUserId: input.account.ownerUserId,
+          pinProvider: input.pinProvider,
         });
-        const { hash } = await submitSignedTransaction(signedXdr);
 
-        return { hash };
+        return outcome.status === "submitted"
+          ? { hash: outcome.hash }
+          : { proposal: outcome.proposal };
       }
 
       if (input.asset === undefined) {

@@ -10,6 +10,7 @@ import {
 
 import { LocalSigner } from "../local-signer";
 import {
+  generateLocalWalletMaterial,
   importLocalWalletMaterial,
   storeLocalWalletMaterial,
 } from "../local-wallet-service";
@@ -88,5 +89,48 @@ describe("LocalSigner", () => {
       )
     ).rejects.toThrow("cancelled");
     expect(pinProvider).not.toHaveBeenCalled();
+  });
+
+  it("appends a second co-signer's signature instead of replacing the first, for multisig", async () => {
+    const materialA = importLocalWalletMaterial(MNEMONIC);
+    await storeLocalWalletMaterial(materialA, "123456");
+    const materialB = generateLocalWalletMaterial();
+    await storeLocalWalletMaterial(materialB, "654321");
+
+    const signerA = new LocalSigner({
+      authorizer: { authorize: async () => {} },
+      pinProvider: async () => "123456",
+      publicKey: materialA.publicKey,
+    });
+    const signerB = new LocalSigner({
+      authorizer: { authorize: async () => {} },
+      pinProvider: async () => "654321",
+      publicKey: materialB.publicKey,
+    });
+
+    const { xdr: signedByA } = await signerA.signTransaction(
+      buildTransaction(materialA.publicKey),
+      { networkPassphrase: Networks.TESTNET }
+    );
+    const { xdr: signedByBoth } = await signerB.signTransaction(signedByA, {
+      networkPassphrase: Networks.TESTNET,
+    });
+
+    const transaction = TransactionBuilder.fromXDR(
+      signedByBoth,
+      Networks.TESTNET
+    );
+
+    expect(transaction.signatures).toHaveLength(2);
+    const verifiesAgainst = (publicKey: string) =>
+      transaction.signatures.some((decoratedSignature) =>
+        Keypair.fromPublicKey(publicKey).verify(
+          transaction.hash(),
+          decoratedSignature.signature()
+        )
+      );
+
+    expect(verifiesAgainst(materialA.publicKey)).toBe(true);
+    expect(verifiesAgainst(materialB.publicKey)).toBe(true);
   });
 });

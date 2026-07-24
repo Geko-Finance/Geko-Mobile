@@ -46,6 +46,13 @@ jest.mock("expo-secure-store", () => ({
   }),
 }));
 
+// The real native module is unavailable under Jest; zustand `persist` stores (wallet-store,
+// proposal-store) need AsyncStorage to even import without throwing.
+jest.mock("@react-native-async-storage/async-storage", () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("@react-native-async-storage/async-storage/jest/async-storage-mock")
+);
+
 beforeEach(() => {
   mockSecureValues.clear();
 });

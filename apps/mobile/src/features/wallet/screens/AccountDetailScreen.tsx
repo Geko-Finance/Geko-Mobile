@@ -312,6 +312,24 @@ export function AccountDetailScreen() {
           </View>
         ) : null}
 
+        {account.custody === "non_custodial" ? (
+          <Pressable
+            accessibilityRole="button"
+            className="mt-4 flex-row items-center justify-between rounded-[20px] bg-[#121214] px-4 py-4"
+            onPress={() =>
+              router.push({
+                pathname: "/multisig",
+                params: { accountId: account.id },
+              })
+            }
+          >
+            <Text className="text-[15px] font-bold text-white">Multisig</Text>
+            <Text className="text-[13px] font-semibold text-[#8E8E92]">
+              Signers &amp; pending approvals
+            </Text>
+          </Pressable>
+        ) : null}
+
         <Text className="mb-3 mt-6 text-[15px] font-bold text-[#8E8E92]">
           Accounts
         </Text>

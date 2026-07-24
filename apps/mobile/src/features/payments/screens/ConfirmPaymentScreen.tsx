@@ -160,7 +160,18 @@ export function ConfirmPaymentScreen() {
                   : {}),
               },
               {
-                onSuccess: (result) =>
+                onSuccess: (result) => {
+                  if (result.proposal !== undefined) {
+                    router.replace({
+                      pathname: "/multisig/proposal/[id]",
+                      params: {
+                        id: result.proposal.id,
+                        accountId: activeAccount.id,
+                      },
+                    });
+                    return;
+                  }
+
                   router.replace({
                     pathname: "/payments/success",
                     params: {
@@ -169,7 +180,8 @@ export function ConfirmPaymentScreen() {
                       hash: result.hash ?? "",
                       assetCode: assetCode ?? "",
                     },
-                  }),
+                  });
+                },
               },
             )
           }

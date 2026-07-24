@@ -1,50 +1,64 @@
-# Welcome to your Expo app 👋
+# Geko
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Turborepo monorepo for the Geko product: the Expo mobile app and its supporting backend services.
 
-## Get started
+## Layout
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+apps/
+  mobile/   # Expo / React Native app (see apps/mobile/README.md)
+  server/   # geko-cavos-server — HTTP wrapper for @cavos/kit Stellar support
+packages/
+  defindex-vault/   # Shared TypeScript client for the DeFindex vault
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Prerequisites
 
-## Learn more
+- Node.js (see `packageManager` in the root `package.json` for the pinned npm version)
+- Package manager: **npm** (workspaces)
 
-To learn more about developing your project with Expo, look at the following resources:
+## Getting started
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+# Install all workspaces (single hoisted lockfile)
+npm install
 
-## Join the community
+# Build shared packages (required before the app can resolve them)
+npm run build
 
-Join our community of developers creating universal apps.
+# Start everything in dev (Turborepo runs each workspace's `dev` script)
+npm run dev
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Run a single app instead:
+
+```bash
+npm run dev -w geko-mobile        # Expo app
+npm run dev -w geko-cavos-server  # backend
+```
+
+## Tasks
+
+All tasks run through Turborepo from the repo root:
+
+| Command             | What it does                                    |
+| ------------------- | ----------------------------------------------- |
+| `npm run build`     | Build shared packages and the server            |
+| `npm run typecheck` | Typecheck every workspace                        |
+| `npm run lint`      | Lint every workspace                             |
+| `npm run test`      | Run each workspace's tests                       |
+| `npm run dev`       | Run all `dev` scripts (persistent)              |
+
+> `packages/defindex-vault` must be built before the mobile app bundles, since
+> the app imports its compiled `dist/`. `turbo`'s `^build` dependency handles
+> this ordering for `build`/`typecheck`/`test`; run `npm run build` after a fresh
+> clone before `npm run dev`.
+
+## EAS builds
+
+Run from the mobile app directory; EAS auto-detects the workspace root:
+
+```bash
+cd apps/mobile
+eas build --profile ios-simulator --platform ios
+```

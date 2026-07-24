@@ -1,7 +1,5 @@
 # Geko
 
-Turborepo monorepo for the Geko product: the Expo mobile app and its supporting backend services.
-
 ## Layout
 
 ```
@@ -41,13 +39,13 @@ npm run dev -w geko-cavos-server  # backend
 
 All tasks run through Turborepo from the repo root:
 
-| Command             | What it does                                    |
-| ------------------- | ----------------------------------------------- |
-| `npm run build`     | Build shared packages and the server            |
-| `npm run typecheck` | Typecheck every workspace                        |
-| `npm run lint`      | Lint every workspace                             |
-| `npm run test`      | Run each workspace's tests                       |
-| `npm run dev`       | Run all `dev` scripts (persistent)              |
+| Command             | What it does                         |
+| ------------------- | ------------------------------------ |
+| `npm run build`     | Build shared packages and the server |
+| `npm run typecheck` | Typecheck every workspace            |
+| `npm run lint`      | Lint every workspace                 |
+| `npm run test`      | Run each workspace's tests           |
+| `npm run dev`       | Run all `dev` scripts (persistent)   |
 
 > `packages/defindex-vault` must be built before the mobile app bundles, since
 > the app imports its compiled `dist/`. `turbo`'s `^build` dependency handles

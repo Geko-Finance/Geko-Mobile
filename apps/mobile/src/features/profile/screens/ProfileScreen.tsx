@@ -1,25 +1,22 @@
-import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import {
-  Copy,
+  Bell,
   Droplet,
-  KeyRound,
   LogOut,
   Plus,
   Wallet,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/src/features/auth/session/SessionProvider";
-import { useViewRecoveryCode } from "@/src/features/profile/api/recovery-queries";
 import {
   useAccountBalances,
   useActiveNetworkId,
@@ -50,9 +47,6 @@ export function ProfileScreen() {
   const balances = useAccountBalances(account?.publicKey);
   const networkId = useActiveNetworkId();
   const fundAccount = useFundTestnetAccount();
-  const viewRecoveryCode = useViewRecoveryCode();
-  const [revealedCode, setRevealedCode] = useState<string | null>(null);
-  const [copiedRecoveryCode, setCopiedRecoveryCode] = useState(false);
   const displayName = session?.user.name ?? session?.user.email ?? "Customer";
   const formattedBalance = useMemo(() => {
     const nativeBalance = balances.data?.find((b) => b.asset.type === "native");
@@ -66,16 +60,6 @@ export function ProfileScreen() {
   const otherBalances = (balances.data ?? []).filter(
     (b) => b.asset.type !== "native",
   );
-
-  const handleCopyRecoveryCode = async () => {
-    if (revealedCode === null) {
-      return;
-    }
-
-    await Clipboard.setStringAsync(revealedCode);
-    setCopiedRecoveryCode(true);
-    setTimeout(() => setCopiedRecoveryCode(false), 2000);
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -159,69 +143,12 @@ export function ProfileScreen() {
                 </>
               ) : null}
               {account.custody === "custodial" ? (
-                <View className="mt-4">
-                  <Pressable
-                    accessibilityRole="button"
-                    className="flex-row items-center gap-2 self-start rounded-full bg-[#242426] px-4 py-2.5"
-                    disabled={viewRecoveryCode.isPending}
-                    onPress={() =>
-                      viewRecoveryCode.mutate(account, {
-                        onSuccess: (code) => setRevealedCode(code),
-                      })
-                    }
-                  >
-                    {viewRecoveryCode.isPending ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <KeyRound color="#FFFFFF" size={16} strokeWidth={2.5} />
-                    )}
-                    <Text className="text-[14px] font-bold text-white">
-                      {viewRecoveryCode.isPending
-                        ? "Loading…"
-                        : "View recovery code"}
-                    </Text>
-                  </Pressable>
-
-                  <Text className="mt-2 text-[12px] font-semibold leading-[16px] text-[#6E6E72]">
-                    Back this up somewhere safe. You&apos;ll only need it if
-                    you sign in to this wallet from a new device.
+                <View className="mt-4 rounded-xl bg-[#1E1E20] px-4 py-3">
+                  <Text className="text-[13px] font-semibold leading-[18px] text-[#8E8E92]">
+                    Your recovery code was shown once when this wallet was
+                    created and can&apos;t be displayed again. If you need to
+                    approve a new device, use the code you saved at setup.
                   </Text>
-
-                  {viewRecoveryCode.isSuccess && revealedCode === null ? (
-                    <Text className="mt-2 text-[13px] font-semibold text-[#8E8E92]">
-                      No recovery code on file for this account yet.
-                    </Text>
-                  ) : null}
-                  {viewRecoveryCode.isError ? (
-                    <Text className="mt-2 text-[13px] font-semibold text-[#FF6B6B]">
-                      Couldn&apos;t load recovery code - please try again.
-                    </Text>
-                  ) : null}
-
-                  {revealedCode !== null ? (
-                    <View className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3">
-                      <Text className="text-[13px] font-semibold text-[#8E8E92]">
-                        Save this somewhere safe - anyone with this code can
-                        approve a new device for this wallet.
-                      </Text>
-                      <Text
-                        className="mt-2 text-[15px] font-bold text-white"
-                        selectable
-                      >
-                        {revealedCode}
-                      </Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        className="mt-3 flex-row items-center gap-2 self-start rounded-full bg-[#242426] px-3 py-2"
-                        onPress={handleCopyRecoveryCode}
-                      >
-                        <Copy color="#FFFFFF" size={14} strokeWidth={2.5} />
-                        <Text className="text-[13px] font-bold text-white">
-                          {copiedRecoveryCode ? "Copied!" : "Copy code"}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
                 </View>
               ) : null}
             </>
@@ -239,6 +166,15 @@ export function ProfileScreen() {
         >
           <Wallet color="#FFFFFF" size={16} strokeWidth={2.5} />
           <Text className="text-[14px] font-bold text-white">Manage wallets</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          className="mt-3 flex-row items-center gap-2 self-start rounded-full bg-[#242426] px-4 py-2.5"
+          onPress={() => router.push("/profile/notification-preferences")}
+        >
+          <Bell color="#FFFFFF" size={16} strokeWidth={2.5} />
+          <Text className="text-[14px] font-bold text-white">Notifications</Text>
         </Pressable>
 
         <Pressable

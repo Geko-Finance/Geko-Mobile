@@ -5,7 +5,7 @@ import { useSession } from "@/src/features/auth/session/SessionProvider";
 export default function AuthLayout() {
   const { status } = useSession();
 
-  if (status === "authenticated") {
+  if (status === "authenticated" || status === "locked") {
     return <Redirect href="/home" />;
   }
 

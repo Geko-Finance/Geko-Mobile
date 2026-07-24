@@ -3,12 +3,12 @@ import { ChevronDown, ChevronRight, QrCode } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { canSend, isLikelyStellarPublicKey } from "@/src/domain/wallet";
 import { useAccountBalances } from "@/src/features/wallet/api/wallet-queries";

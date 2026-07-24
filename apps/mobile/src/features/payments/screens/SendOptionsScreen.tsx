@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
 import { ArrowUpRight, ChevronRight, Globe, QrCode } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { canSend } from "@/src/domain/wallet";
 import { BackButton } from "@/src/features/shared/components/BackButton";
@@ -108,7 +109,7 @@ export function SendOptionsScreen() {
 
         {activeAccount !== null && !canSend(activeAccount) ? (
           <Text className="mt-4 text-[13px] font-semibold text-[#8E8E92]">
-            {activeAccount.name} can&apos;t send — switch to a custodial wallet to
+            {activeAccount.name} can&apos;t send — switch to a signing wallet to
             send payments.
           </Text>
         ) : null}

@@ -13,12 +13,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { useWalletStore } from "@/src/features/wallet/state/wallet-store";
 import { deviceBiometricAuthorizer } from "@/src/services/wallet/biometric-authorizer";
-import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
+import { getLocalWalletErrorMessage, LocalWalletError } from "@/src/services/wallet/local-wallet-errors";
 import {
   importLocalWalletMaterial,
   isValidWalletPin,
   storeLocalWalletMaterial,
 } from "@/src/services/wallet/local-wallet-service";
+import { registerNonCustodialWallet } from "@/src/services/wallet/register-non-custodial-wallet";
 
 export function ImportSelfCustodyWalletScreen() {
   const router = useRouter();
@@ -58,7 +59,17 @@ export function ImportSelfCustodyWalletScreen() {
       }
 
       await deviceBiometricAuthorizer.authorize("Import self-custody wallet");
-      await storeLocalWalletMaterial(material, pin);
+      try {
+        await storeLocalWalletMaterial(material, pin);
+      } catch (caught) {
+        // Keys may already be on-device from a prior attempt that failed at backend sync.
+        if (
+          !(caught instanceof LocalWalletError && caught.code === "DUPLICATE_WALLET")
+        ) {
+          throw caught;
+        }
+      }
+      await registerNonCustodialWallet(material.publicKey);
       addAccount({
         createdAt: new Date().toISOString(),
         custody: "non_custodial",

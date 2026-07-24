@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "bundleIdentifier": "com.villarley.geko-backend"
+  }
+}

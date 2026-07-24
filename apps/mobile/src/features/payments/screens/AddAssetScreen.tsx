@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { isLikelyStellarPublicKey } from "@/src/domain/wallet";
 import { useAddTrustline } from "@/src/features/payments/api/payment-queries";
@@ -18,6 +18,7 @@ import {
   searchAssets,
   type AssetSearchResult,
 } from "@/src/services/api/stellar/asset-search";
+import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
 
 export function AddAssetScreen() {
   const router = useRouter();
@@ -30,7 +31,10 @@ export function AddAssetScreen() {
   const [selected, setSelected] = useState<AssetSearchResult | null>(null);
   const [code, setCode] = useState("");
   const [issuer, setIssuer] = useState("");
+  const [walletPin, setWalletPin] = useState("");
 
+  const needsPin = activeAccount?.custody === "non_custodial";
+  const pinReady = !needsPin || walletPin.length === 6;
   const trimmedCode = code.trim();
   const trimmedIssuer = issuer.trim();
   const codeValid = trimmedCode.length > 0 && trimmedCode.length <= 12;
@@ -42,7 +46,12 @@ export function AddAssetScreen() {
 
   const searchValid = selected !== null;
   const submitEnabled =
-    mode === "search" ? searchValid : formValid;
+    (mode === "search" ? searchValid : formValid) && pinReady;
+  const trustlineError = addTrustline.isError
+    ? addTrustline.error.name === "LocalWalletError"
+      ? getLocalWalletErrorMessage(addTrustline.error)
+      : "Couldn't add trustline — please try again."
+    : null;
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -131,9 +140,9 @@ export function AddAssetScreen() {
                   Enter a valid asset code and issuer address.
                 </Text>
               ) : null}
-              {addTrustline.isError ? (
+              {trustlineError !== null ? (
                 <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
-                  Couldn&apos;t add trustline — please try again.
+                  {trustlineError}
                 </Text>
               ) : null}
             </View>
@@ -195,9 +204,9 @@ export function AddAssetScreen() {
                   No matching assets found.
                 </Text>
               ) : null}
-              {addTrustline.isError ? (
+              {trustlineError !== null ? (
                 <Text className="mt-3 text-[13px] font-semibold text-[#FF6B6B]">
-                  Couldn&apos;t add trustline — please try again.
+                  {trustlineError}
                 </Text>
               ) : null}
             </View>
@@ -212,6 +221,27 @@ export function AddAssetScreen() {
           </>
         ) : null}
 
+        {needsPin ? (
+          <View className="mt-6 rounded-[20px] bg-[#121214] px-5 py-5">
+            <Text className="text-[13px] font-semibold text-[#8E8E92]">
+              Wallet PIN
+            </Text>
+            <Text className="mt-1 text-[13px] leading-5 text-[#8E8E92]">
+              Enter your six-digit wallet PIN to sign the trustline on-device.
+            </Text>
+            <TextInput
+              className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3 text-[15px] font-semibold text-white"
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="6-digit wallet PIN"
+              placeholderTextColor="#6E6E72"
+              secureTextEntry
+              value={walletPin}
+              onChangeText={setWalletPin}
+            />
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           className={`mt-7 self-start rounded-full px-4 py-2.5 ${
@@ -224,7 +254,14 @@ export function AddAssetScreen() {
             const assetIssuer =
               mode === "search" ? selected!.issuer : trimmedIssuer;
             addTrustline.mutate(
-              { account: activeAccount, code: assetCode, issuer: assetIssuer },
+              {
+                account: activeAccount,
+                code: assetCode,
+                issuer: assetIssuer,
+                ...(needsPin
+                  ? { pinProvider: async () => walletPin }
+                  : {}),
+              },
               { onSuccess: () => router.back() },
             );
           }}

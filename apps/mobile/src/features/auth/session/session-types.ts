@@ -12,9 +12,17 @@ export interface SessionUser {
 
 export interface Session {
   user: SessionUser;
-  // Cavos hosted auth resolves an Identity directly - there is no access/refresh
-  // token pair the app ever sees, unlike a classic username/password backend.
   tokens?: SessionTokens;
 }
 
-export type SessionStatus = "loading" | "authenticated" | "anonymous";
+/**
+ * - `loading`: bootstrap in progress
+ * - `authenticated`: valid session, app unlocked
+ * - `locked`: stored session with tokens exists, awaiting Face ID / biometric unlock
+ * - `anonymous`: no session
+ */
+export type SessionStatus =
+  | "loading"
+  | "authenticated"
+  | "locked"
+  | "anonymous";

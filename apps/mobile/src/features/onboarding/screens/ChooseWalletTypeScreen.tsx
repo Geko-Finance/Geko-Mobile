@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { ChevronRight, KeyRound, ShieldCheck } from "lucide-react-native";
-import { Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export function ChooseWalletTypeScreen() {
   const router = useRouter();
@@ -42,26 +43,24 @@ export function ChooseWalletTypeScreen() {
           <ChevronRight color="#6E6E72" size={20} strokeWidth={2.5} />
         </Pressable>
 
-        <View className="mt-3 flex-row items-center rounded-[20px] bg-[#121214] px-4 py-4 opacity-50">
+        <Pressable
+          accessibilityRole="button"
+          className="mt-3 flex-row items-center rounded-[20px] bg-[#121214] px-4 py-4"
+          onPress={() => router.push("/wallet/create")}
+        >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-[#1E1E20]">
-            <KeyRound color="#8E8E92" size={22} strokeWidth={2} />
+            <KeyRound color="#5BED97" size={22} strokeWidth={2} />
           </View>
           <View className="ml-3 flex-1">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-[16px] font-bold text-white">
-                Non-custodial
-              </Text>
-              <View className="rounded-full bg-[#242426] px-2 py-0.5">
-                <Text className="text-[11px] font-bold text-[#8E8E92]">
-                  Coming soon
-                </Text>
-              </View>
-            </View>
+            <Text className="text-[16px] font-bold text-white">
+              Non-custodial
+            </Text>
             <Text className="mt-1 text-[13px] font-semibold leading-[18px] text-[#8E8E92]">
               Hold your own keys on-device. No third party ever sees them.
             </Text>
           </View>
-        </View>
+          <ChevronRight color="#6E6E72" size={20} strokeWidth={2.5} />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

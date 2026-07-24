@@ -1,5 +1,6 @@
 import { Redirect, Stack, usePathname } from "expo-router";
 
+import { UnlockScreen } from "@/src/features/auth/screens/UnlockScreen";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { useWalletAccounts } from "@/src/features/wallet/state/wallet-store";
 
@@ -14,6 +15,10 @@ export default function AppLayout() {
 
   if (status === "anonymous") {
     return <Redirect href="/welcome" />;
+  }
+
+  if (status === "locked") {
+    return <UnlockScreen />;
   }
 
   // Persistent guard, not a one-shot post-login check: an authenticated user with
@@ -54,6 +59,7 @@ export default function AppLayout() {
       <Stack.Screen name="kyc/document" />
       <Stack.Screen name="kyc/selfie" />
       <Stack.Screen name="kyc/review" />
+      <Stack.Screen name="profile/notification-preferences" />
     </Stack>
   );
 }

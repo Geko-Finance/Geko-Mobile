@@ -1,16 +1,19 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSendPayment } from "@/src/features/payments/api/payment-queries";
 import { BackButton } from "@/src/features/shared/components/BackButton";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
+import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-errors";
 
 function getFriendlyErrorMessage(error: Error | null): string | null {
   if (error === null) {
@@ -18,10 +21,12 @@ function getFriendlyErrorMessage(error: Error | null): string | null {
   }
 
   switch (error.name) {
+    case "LocalWalletError":
+      return getLocalWalletErrorMessage(error);
     case "CavosProviderUnavailableError":
       return "Cavos is temporarily unavailable — please try again in a moment.";
     case "CavosSessionExpiredError":
-      return "Your session has expired — please try again.";
+      return "This device needs approval — enter your recovery code to continue.";
     case "ApiError":
       if (error.message.includes("op_no_trust")) {
         return "The recipient hasn't added a trustline for this asset yet — they need to add it before you can send.";
@@ -44,6 +49,9 @@ export function ConfirmPaymentScreen() {
     }>();
   const activeAccount = useActiveAccount();
   const sendPayment = useSendPayment();
+  const [walletPin, setWalletPin] = useState("");
+  const needsPin = activeAccount?.custody === "non_custodial";
+  const pinReady = !needsPin || walletPin.length === 6;
 
   if (activeAccount === null) {
     return (
@@ -67,6 +75,7 @@ export function ConfirmPaymentScreen() {
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 pb-10 pt-4"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-2">
@@ -104,6 +113,27 @@ export function ConfirmPaymentScreen() {
           ) : null}
         </View>
 
+        {needsPin ? (
+          <View className="mt-6 rounded-[20px] bg-[#121214] px-5 py-5">
+            <Text className="text-[13px] font-semibold text-[#8E8E92]">
+              Wallet PIN
+            </Text>
+            <Text className="mt-1 text-[13px] leading-5 text-[#8E8E92]">
+              Enter your six-digit wallet PIN to sign this payment on-device.
+            </Text>
+            <TextInput
+              className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3 text-[15px] font-semibold text-white"
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="6-digit wallet PIN"
+              placeholderTextColor="#6E6E72"
+              secureTextEntry
+              value={walletPin}
+              onChangeText={setWalletPin}
+            />
+          </View>
+        ) : null}
+
         {inlineError ? (
           <Text className="mt-4 text-[13px] font-semibold text-[#FF6B6B]">
             {inlineError}
@@ -111,8 +141,10 @@ export function ConfirmPaymentScreen() {
         ) : null}
 
         <Pressable
-          className="mt-7 self-start rounded-full bg-[#237BFF] px-4 py-2.5"
-          disabled={sendPayment.isPending}
+          className={`mt-7 self-start rounded-full px-4 py-2.5 ${
+            pinReady ? "bg-[#237BFF]" : "bg-[#1B3A5C]"
+          }`}
+          disabled={!pinReady || sendPayment.isPending}
           onPress={() =>
             sendPayment.mutate(
               {
@@ -123,6 +155,9 @@ export function ConfirmPaymentScreen() {
                   ? { asset: { code: assetCode, issuer: assetIssuer } }
                   : {}),
                 ...(typeof memo === "string" && memo.length > 0 ? { memo } : {}),
+                ...(needsPin
+                  ? { pinProvider: async () => walletPin }
+                  : {}),
               },
               {
                 onSuccess: (result) =>
@@ -145,7 +180,11 @@ export function ConfirmPaymentScreen() {
               <Text className="text-[14px] font-bold text-white">Sending…</Text>
             </View>
           ) : (
-            <Text className="text-[14px] font-bold text-white">
+            <Text
+              className={`text-[14px] font-bold ${
+                pinReady ? "text-white" : "text-white/50"
+              }`}
+            >
               Confirm & send
             </Text>
           )}

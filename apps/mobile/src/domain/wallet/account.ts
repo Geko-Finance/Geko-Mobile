@@ -1,15 +1,13 @@
 /**
  * Wallet custody model. There are two ways this app can give a user a real,
  * signing-capable wallet:
- *   - `custodial` - keys held by a third-party signer (Cavos). This is the ONLY
- *     one implemented today: see src/services/api/cavos/* and
+ *   - `custodial` - keys held by a third-party signer (Cavos). See
+ *     src/services/api/cavos/* and
  *     src/features/onboarding/screens/CustodialOnboardingScreen.tsx.
- *   - `non_custodial` - keys held on-device (e.g. in SecureStore), signed locally
- *     with no third party in the loop. This value is reserved in the type but has
- *     NO factory and NO WalletSigner implementation yet - do not assume it works;
- *     `canSend()` below already excludes it. Build it as its own epic (device
- *     keypair generation/storage, a local-signing WalletSigner adapter) rather
- *     than assuming it can reuse the Cavos plumbing.
+ *   - `non_custodial` - keys held on-device (SecureStore), signed locally via
+ *     LocalSigner with no third party in the loop. Factory + storage live in
+ *     src/services/wallet/local-wallet-service.ts; onboarding is
+ *     CreateSelfCustodyWalletScreen / ImportSelfCustodyWalletScreen.
  *   - `watch_only` - the app tracks the address but holds no keys at all
  *     (pasted/watched addresses and Friendbot-funded dev accounts); such accounts
  *     can never sign.
@@ -49,11 +47,13 @@ export function isLikelyStellarPublicKey(value: string): boolean {
 
 /**
  * Whether this account can send/sign transactions in the app today.
- * Only custodial accounts (backed by a real signer, e.g. Cavos) qualify;
- * `watch_only` accounts hold no keys, and `non_custodial` has no signer implementation yet.
+ * Custodial (Cavos) and non-custodial (LocalSigner) accounts qualify;
+ * `watch_only` accounts hold no keys and can never sign.
  */
 export function canSend(account: WalletAccount): boolean {
-  return account.custody === "custodial";
+  return (
+    account.custody === "custodial" || account.custody === "non_custodial"
+  );
 }
 
 /**

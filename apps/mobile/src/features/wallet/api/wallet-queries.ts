@@ -5,7 +5,6 @@ import type { Balance, StellarNetworkId, WalletAccount } from "@/src/domain/wall
 import { useSession } from "@/src/features/auth/session/SessionProvider";
 import { connectCustodialAccount } from "@/src/services/api/cavos/cavos-account-factory";
 import { signTestCustodialPayment } from "@/src/services/api/cavos/cavos-test-payment";
-import type { CavosIdentity } from "@/src/services/api/cavos/cavos-types";
 import { createFundedTestAccount } from "@/src/services/api/stellar/account-factory";
 import { fundTestnetAccount } from "@/src/services/api/stellar/friendbot";
 import {
@@ -104,15 +103,14 @@ export function useFundTestnetAccount() {
 }
 
 /**
- * Connects a Cavos custodial wallet for the given identity and registers it locally -
- * covers both first-time creation and reconnecting on a later device (connect is
- * deterministic per identity, see cavos-account-factory.ts). Preserves an existing
- * local display name when the account is already known.
+ * Creates a Cavos custodial wallet for the authenticated session and registers it
+ * locally (see cavos-account-factory.ts). Preserves an existing local display name
+ * when the account is already known.
  */
 export function useConnectCustodialWallet() {
   return useMutation({
-    mutationFn: async (input: { identity: CavosIdentity; name?: string }) =>
-      connectCustodialAccount(input.identity, input.name),
+    mutationFn: async (input?: { name?: string }) =>
+      connectCustodialAccount(input?.name),
     onSuccess: ({ account }) => {
       const existing = useWalletStore
         .getState()

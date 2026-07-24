@@ -1,9 +1,9 @@
 import type { WalletAccount } from "@/src/domain/wallet";
+import { useSessionStore } from "@/src/features/auth/session/session-store";
 import { fundTestnetAccount } from "@/src/services/api/stellar/friendbot";
 
 import { getCavosClient } from "./cavos-client";
-import { setStoredCavosSession } from "./cavos-session-storage";
-import type { CavosIdentity } from "./cavos-types";
+import { CavosProviderUnavailableError } from "./cavos-errors";
 
 /**
  * TEMPORARY: exactly one custodial Cavos wallet per real-user identity, created
@@ -13,7 +13,7 @@ import type { CavosIdentity } from "./cavos-types";
  * many accounts per owner (see WalletScreen's watch-only/test-wallet additions).
  *
  * The real blocker for multi-wallet-per-user later isn't the local data model -
- * it's that `Cavos.connect(identity)` is deterministic: the SAME identity always
+ * it's that Cavos's connect(identity) is deterministic: the SAME identity always
  * resolves to the SAME on-chain address. Genuine multiple custodial wallets per
  * user will need either Cavos-side multi-wallet derivation (check their docs
  * when this becomes real work) or a per-slot identity scheme on our own backend
@@ -22,37 +22,49 @@ import type { CavosIdentity } from "./cavos-types";
  * against the current identity shape without solving this first.
  */
 
-/** Result of connecting a custodial Cavos wallet for an identity on this device. */
+/** Result of creating a custodial Cavos wallet for the authenticated session. */
 export interface ConnectCustodialAccountResult {
   readonly account: WalletAccount;
   /**
-   * True when Cavos doesn't recognize this device for this identity yet - the
+   * True when Cavos doesn't recognize this device for this wallet yet - the
    * caller must collect the account's recovery code and approve this device
    * (see `useRecoverWithCode`) before it can sign transactions.
    */
   readonly needsDeviceApproval: boolean;
+  /**
+   * Plaintext recovery code revealed exactly once at wallet creation. Present
+   * only when the backend returns `revealOnce.recoveryCode` — it can never be
+   * re-fetched afterward. The caller must show/confirm it to the user before
+   * leaving onboarding.
+   */
+  readonly recoveryCode?: string;
 }
 
 /**
- * Connects a custodial Cavos wallet for the given identity, persists the session,
- * and returns a custodial WalletAccount for local registration. `Cavos.connect(identity)`
- * is deterministic - the same identity always resolves to the same address - so this
- * one call covers both first-time creation and reconnecting on a later device; there's
- * no separate "create" vs "recover" API. Runs automatically right after login for a
- * user with no local wallet yet, no manual create/recover step needed.
+ * Creates a custodial Cavos wallet for the current authenticated session via
+ * `POST /wallets`, and returns a custodial WalletAccount for local registration.
+ * `ownerUserId` comes from the session store (Bearer-scoped on the backend);
+ * there is no identity parameter to pass. Friendbot funding is best-effort on
+ * testnet.
  */
 export async function connectCustodialAccount(
-  identity: CavosIdentity,
   name?: string
 ): Promise<ConnectCustodialAccountResult> {
-  const session = await getCavosClient().connect(identity);
-  await setStoredCavosSession(session);
+  const session = useSessionStore.getState().session;
+
+  if (session === null) {
+    throw new CavosProviderUnavailableError(
+      "Authentication required to create a custodial wallet"
+    );
+  }
+
+  const { wallet, revealOnce } = await getCavosClient().createWallet();
 
   // Cavos sponsors on-chain account creation but leaves 0 XLM spendable; Friendbot tops
-  // up testnet wallets. Safe to call on every connect, not just the first time - Friendbot
+  // up testnet wallets. Safe to call on every create, not just the first time - Friendbot
   // no-ops harmlessly against an already-funded account, and this call is best-effort.
   try {
-    await fundTestnetAccount(session.address);
+    await fundTestnetAccount(wallet.publicAddress);
   } catch {
     // Best-effort only - unavailable on mainnet or transient failures must not block connecting.
   }
@@ -61,11 +73,14 @@ export async function connectCustodialAccount(
     account: {
       createdAt: new Date().toISOString(),
       custody: "custodial",
-      id: session.address,
-      name: name?.trim() || "Cavos Wallet",
-      ownerUserId: identity.userId,
-      publicKey: session.address,
+      id: wallet.id,
+      name: name?.trim() || wallet.label?.trim() || "Cavos Wallet",
+      ownerUserId: session.user.id,
+      publicKey: wallet.publicAddress,
     },
-    needsDeviceApproval: session.status === "needs-device-approval",
+    needsDeviceApproval: wallet.status === "needs_device_approval",
+    ...(revealOnce?.recoveryCode !== undefined
+      ? { recoveryCode: revealOnce.recoveryCode }
+      : {}),
   };
 }

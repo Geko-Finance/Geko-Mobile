@@ -8,7 +8,7 @@ export interface SaveContactPromptProps {
   visible: boolean;
   address: string;
   onDismiss: () => void;
-  /** Caller persists the contact (e.g. via `useContactsStore().upsertContact`) and closes the prompt. */
+  /** Caller persists the contact (e.g. via `useCreateContact()`) and closes the prompt. */
   onSave: (label: string) => void;
 }
 

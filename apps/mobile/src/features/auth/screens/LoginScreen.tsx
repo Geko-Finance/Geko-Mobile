@@ -4,19 +4,22 @@ import {
   ActivityIndicator,
   ImageBackground,
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   useSendOtp,
   useSocialLogin,
   useVerifyOtp,
 } from "@/src/features/auth/api/cavos-auth-queries";
+import {
+  toAppSession,
+  type AuthSessionResult,
+} from "@/src/features/auth/api/auth-client";
 import { useSession } from "@/src/features/auth/session/SessionProvider";
-import type { ResolvedAuthIdentity } from "@/src/services/api/cavos-auth/cavos-auth-client";
 
 export function LoginScreen() {
   const router = useRouter();
@@ -29,10 +32,8 @@ export function LoginScreen() {
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
 
-  const finishLogin = async (identity: ResolvedAuthIdentity) => {
-    await signIn({
-      user: { id: identity.userId, email: identity.email, name: identity.name },
-    });
+  const finishLogin = async (authSession: AuthSessionResult) => {
+    await signIn(toAppSession(authSession));
     // (app)/_layout.tsx's wallet-ownership guard takes it from here - it redirects
     // to onboarding itself if this session's user doesn't own a wallet yet.
     router.replace("/home");
@@ -49,11 +50,11 @@ export function LoginScreen() {
 
   const handleVerifyCode = async () => {
     try {
-      const identity = await verifyOtp.mutateAsync({
+      const authSession = await verifyOtp.mutateAsync({
         email: email.trim(),
         code: code.trim(),
       });
-      await finishLogin(identity);
+      await finishLogin(authSession);
     } catch {
       // verifyOtp.isError drives inline error display below.
     }
@@ -61,8 +62,8 @@ export function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      const identity = await googleLogin.mutateAsync();
-      await finishLogin(identity);
+      const authSession = await googleLogin.mutateAsync();
+      await finishLogin(authSession);
     } catch {
       // googleLogin.isError drives inline error display below.
     }
@@ -70,8 +71,8 @@ export function LoginScreen() {
 
   const handleAppleLogin = async () => {
     try {
-      const identity = await appleLogin.mutateAsync();
-      await finishLogin(identity);
+      const authSession = await appleLogin.mutateAsync();
+      await finishLogin(authSession);
     } catch {
       // appleLogin.isError drives inline error display below.
     }

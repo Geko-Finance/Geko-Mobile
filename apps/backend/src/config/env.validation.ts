@@ -40,6 +40,23 @@ export class EnvironmentVariables {
   /** Base64-encoded 32-byte AES-256 key (e.g. `openssl rand -base64 32`). */
   @IsString()
   WALLET_SECRETS_ENCRYPTION_KEY!: string;
+
+  /**
+   * Cross-border (Abroad Finance) integration - all three optional, unlike every var above.
+   * AbroadFinanceProvider degrades gracefully (503s cross-border endpoints, never crashes
+   * boot) when any of these are absent - see cross-border/providers/abroad-finance.provider.ts.
+   */
+  @IsOptional()
+  @IsString()
+  ABROAD_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  ABROAD_WEBHOOK_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  ABROAD_STELLAR_DEPOSIT_ADDRESS?: string;
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {

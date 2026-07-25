@@ -100,4 +100,23 @@ export class NotificationsListener {
       },
     });
   }
+
+  @OnEvent('cross_border.tx.status_changed')
+  handleCrossBorderStatusChanged(payload: {
+    userId: string;
+    crossBorderTransactionId: string;
+    abroadTransactionId: string;
+    status: string;
+  }): Promise<void> {
+    return this.notificationsService.sendToUser(payload.userId, {
+      category: 'transactions',
+      title: 'Cross-border payment update',
+      body: `Your cross-border payment is now ${payload.status}.`,
+      data: {
+        type: 'cross_border.tx.status_changed',
+        crossBorderTransactionId: payload.crossBorderTransactionId,
+        status: payload.status,
+      },
+    });
+  }
 }

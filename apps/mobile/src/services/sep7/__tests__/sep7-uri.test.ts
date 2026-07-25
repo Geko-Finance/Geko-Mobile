@@ -1,6 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { Sep7ParseError, buildSep7TxUri, isSep7Uri, parseSep7Uri } from "../sep7-uri";
+import {
+  Sep7ParseError,
+  buildSep7TxUri,
+  getSep7Operation,
+  isSep7Uri,
+  parseSep7Uri,
+} from "../sep7-uri";
 
 const XDR = "AAAAAgAAAAB+exampleenvelopexdr==";
 const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
@@ -13,6 +19,25 @@ describe("isSep7Uri", () => {
   it("rejects anything else", () => {
     expect(isSep7Uri("https://example.com")).toBe(false);
     expect(isSep7Uri(XDR)).toBe(false);
+  });
+});
+
+describe("getSep7Operation", () => {
+  it("recognizes tx and pay", () => {
+    expect(getSep7Operation("web+stellar:tx?xdr=abc")).toBe("tx");
+    expect(getSep7Operation("web+stellar:pay?destination=GABC")).toBe("pay");
+  });
+
+  it("returns null for a non-SEP-7 string", () => {
+    expect(getSep7Operation("https://example.com")).toBeNull();
+  });
+
+  it("returns null for an unrecognized operation", () => {
+    expect(getSep7Operation("web+stellar:refund?xdr=abc")).toBeNull();
+  });
+
+  it("returns null when there is no operation at all", () => {
+    expect(getSep7Operation("web+stellar:")).toBeNull();
   });
 });
 

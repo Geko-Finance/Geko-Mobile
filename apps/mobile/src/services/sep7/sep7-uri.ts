@@ -2,9 +2,10 @@
  * SEP-7 `web+stellar:` URI encode/decode for sharing a transaction envelope with co-signers.
  * See https://developers.stellar.org/docs/build/apps/wallet/sep7
  *
- * Only the `tx` operation is supported (this app never builds `pay` request URIs). Parsing
- * uses manual string splitting + `URLSearchParams` for the query portion rather than the
- * global `URL` class, since `web+stellar:` is a non-hierarchical custom scheme (no `//`) and
+ * This module handles the `tx` operation only (`pay` requests live in `sep7-pay-uri.ts`,
+ * a sibling additive module - see `getSep7Operation` below for routing between the two).
+ * Parsing uses manual string splitting + `URLSearchParams` for the query portion rather than
+ * the global `URL` class, since `web+stellar:` is a non-hierarchical custom scheme (no `//`) and
  * `URL`'s handling of custom schemes varies across polyfills/platforms - `URLSearchParams` on
  * its own only ever sees a plain query string, so it has no scheme-parsing behavior to vary.
  *
@@ -34,6 +35,25 @@ export interface Sep7TxRequest {
 /** Whether `value` looks like a SEP-7 URI (any operation), cheap check before attempting to parse. */
 export function isSep7Uri(value: string): boolean {
   return value.startsWith(SEP7_SCHEME);
+}
+
+/**
+ * Cheap operation sniff, for routing a scanned/opened URI to the right parser (this module's
+ * `parseSep7Uri` for `tx`, or `sep7-pay-uri.ts`'s `parseSep7PayUri` for `pay`) without fully
+ * parsing either. Returns `null` for a non-SEP-7 string or an unrecognized operation.
+ */
+export function getSep7Operation(uri: string): "tx" | "pay" | null {
+  if (!isSep7Uri(uri)) {
+    return null;
+  }
+
+  const queryIndex = uri.indexOf("?");
+  const operation =
+    queryIndex === -1
+      ? uri.slice(SEP7_SCHEME.length)
+      : uri.slice(SEP7_SCHEME.length, queryIndex);
+
+  return operation === "tx" || operation === "pay" ? operation : null;
 }
 
 /** Builds a `web+stellar:tx?...` URI carrying a (possibly partially-signed) transaction envelope. */

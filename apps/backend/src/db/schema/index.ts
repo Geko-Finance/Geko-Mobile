@@ -1,6 +1,7 @@
 export * from './audit';
 export * from './auth';
 export * from './contacts';
+export * from './cross-border';
 export * from './devices';
 export * from './enums';
 export * from './notifications';

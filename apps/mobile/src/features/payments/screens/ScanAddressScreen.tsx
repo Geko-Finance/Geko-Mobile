@@ -6,6 +6,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { isLikelyStellarPublicKey } from "@/src/domain/wallet";
 import { BackButton } from "@/src/features/shared/components/BackButton";
+import { parseSep7PayUri } from "@/src/services/sep7/sep7-pay-uri";
+import { Sep7ParseError, getSep7Operation, isSep7Uri } from "@/src/services/sep7/sep7-uri";
 
 export function ScanAddressScreen() {
   const router = useRouter();
@@ -18,11 +20,46 @@ export function ScanAddressScreen() {
       return;
     }
 
-    if (isLikelyStellarPublicKey(data.trim())) {
+    const trimmed = data.trim();
+
+    // A `web+stellar:tx?...` scan (multisig co-signer link) is out of scope for this screen -
+    // that flow has its own dedicated scanner (features/multisig/screens/Sep7ScanScreen.tsx).
+    if (isSep7Uri(trimmed) && getSep7Operation(trimmed) === "pay") {
+      try {
+        const payRequest = parseSep7PayUri(trimmed);
+
+        setHandled(true);
+        router.replace({
+          pathname: "/payments/send",
+          params: {
+            destination: payRequest.destination,
+            ...(payRequest.amount !== undefined ? { amount: payRequest.amount } : {}),
+            ...(payRequest.asset !== undefined
+              ? {
+                  assetCode: payRequest.asset.code,
+                  assetIssuer: payRequest.asset.issuer!,
+                }
+              : {}),
+            ...(payRequest.memo !== undefined ? { memo: payRequest.memo } : {}),
+          },
+        });
+        return;
+      } catch (error) {
+        if (!(error instanceof Sep7ParseError)) {
+          throw error;
+        }
+
+        setScannedInvalid(true);
+        setTimeout(() => setScannedInvalid(false), 2000);
+        return;
+      }
+    }
+
+    if (isLikelyStellarPublicKey(trimmed)) {
       setHandled(true);
       router.replace({
         pathname: "/payments/send",
-        params: { scannedAddress: data.trim() },
+        params: { scannedAddress: trimmed },
       });
       return;
     }

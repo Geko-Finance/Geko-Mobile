@@ -17,7 +17,21 @@ import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 
 export function SendPaymentScreen() {
   const router = useRouter();
-  const { scannedAddress } = useLocalSearchParams<{ scannedAddress?: string }>();
+  const {
+    scannedAddress,
+    destination: scannedDestination,
+    amount: scannedAmount,
+    assetCode: scannedAssetCode,
+    assetIssuer: scannedAssetIssuer,
+    memo: scannedMemo,
+  } = useLocalSearchParams<{
+    scannedAddress?: string;
+    destination?: string;
+    amount?: string;
+    assetCode?: string;
+    assetIssuer?: string;
+    memo?: string;
+  }>();
   const activeAccount = useActiveAccount();
   const balances = useAccountBalances(activeAccount?.publicKey);
   const [destination, setDestination] = useState("");
@@ -30,12 +44,40 @@ export function SendPaymentScreen() {
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [memo, setMemo] = useState("");
 
+  // Two mutually exclusive prefill sources, by construction: ScanAddressScreen routes here
+  // with EITHER `scannedAddress` alone (bare-address scan) OR the full pay-request param set
+  // (a SEP-7 `web+stellar:pay?...` scan) - never both at once.
   useEffect(() => {
     if (typeof scannedAddress === "string" && scannedAddress.length > 0) {
       setDestination(scannedAddress);
       setEditingDestination(false);
+      return;
     }
-  }, [scannedAddress]);
+
+    if (typeof scannedDestination === "string" && scannedDestination.length > 0) {
+      setDestination(scannedDestination);
+      setEditingDestination(false);
+    }
+
+    if (typeof scannedAmount === "string" && scannedAmount.length > 0) {
+      setAmount(scannedAmount);
+    }
+
+    if (typeof scannedAssetCode === "string" && typeof scannedAssetIssuer === "string") {
+      setSelectedAsset({ code: scannedAssetCode, issuer: scannedAssetIssuer });
+    }
+
+    if (typeof scannedMemo === "string" && scannedMemo.length > 0) {
+      setMemo(scannedMemo);
+    }
+  }, [
+    scannedAddress,
+    scannedDestination,
+    scannedAmount,
+    scannedAssetCode,
+    scannedAssetIssuer,
+    scannedMemo,
+  ]);
 
   if (activeAccount === null) {
     return (

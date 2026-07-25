@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { auditLogs } from './audit';
 import { authIdentities, sessions } from './auth';
 import { contacts } from './contacts';
+import { crossBorderTransactions } from './cross-border';
 import { userDevices } from './devices';
 import { notificationPreferences } from './notifications';
 import { users } from './users';
@@ -20,6 +21,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   contacts: many(contacts),
   auditLogs: many(auditLogs),
   notificationPreferences: one(notificationPreferences),
+  crossBorderTransactions: many(crossBorderTransactions),
 }));
 
 export const authIdentitiesRelations = relations(authIdentities, ({ one }) => ({
@@ -108,3 +110,17 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     references: [wallets.id],
   }),
 }));
+
+export const crossBorderTransactionsRelations = relations(
+  crossBorderTransactions,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [crossBorderTransactions.userId],
+      references: [users.id],
+    }),
+    wallet: one(wallets, {
+      fields: [crossBorderTransactions.walletId],
+      references: [wallets.id],
+    }),
+  }),
+);

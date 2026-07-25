@@ -29,3 +29,29 @@ export const walletStatusEnum = pgEnum('wallet_status', [
 export const networkEnum = pgEnum('network', ['testnet', 'mainnet']);
 
 export const devicePlatformEnum = pgEnum('device_platform', ['ios', 'android']);
+
+/** Mirrors Abroad Finance's transaction status lifecycle exactly (see docs.abroad.finance). */
+export const crossBorderStatusEnum = pgEnum('cross_border_status', [
+  'AWAITING_PAYMENT',
+  'PROCESSING_PAYMENT',
+  'PAYMENT_COMPLETED',
+  'PAYMENT_FAILED',
+  'PAYMENT_EXPIRED',
+  'WRONG_AMOUNT',
+]);
+
+export const crossBorderNetworkEnum = pgEnum('cross_border_network', [
+  'STELLAR',
+  'SOLANA',
+  'CELO',
+]);
+
+export const crossBorderPaymentMethodEnum = pgEnum('cross_border_payment_method', [
+  'BREB',
+  'PIX',
+]);
+
+export const crossBorderTargetCurrencyEnum = pgEnum('cross_border_target_currency', [
+  'COP',
+  'BRL',
+]);

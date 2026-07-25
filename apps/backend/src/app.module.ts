@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SharedModule } from './shared/shared.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { CrossBorderModule } from './cross-border/cross-border.module';
 import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { WalletsModule } from './wallets/wallets.module';
     HealthModule,
     WalletsModule,
     ContactsModule,
+    CrossBorderModule,
     NotificationsModule,
   ],
 })

@@ -8,10 +8,23 @@ interface AppConfig {
   backendUrl: string;
   cavosAppId: string;
   cavosAppSalt: string;
+  /** Circle's USDC issuer (G...) on Stellar testnet - see src/services/api/cctp/cctp-config.ts. */
+  cctpUsdcIssuerTestnet: string;
+  /** Circle's USDC issuer (G...) on Stellar mainnet - see src/services/api/cctp/cctp-config.ts. */
+  cctpUsdcIssuerMainnet: string;
   environment: AppEnvironment;
   requestTimeoutMs: number;
   stellarNetwork: StellarNetworkId;
 }
+
+/**
+ * Circle's official USDC issuer accounts on Stellar - confirmed against Circle's own
+ * contract-address reference (https://developers.circle.com/stablecoins/usdc-contract-addresses),
+ * fetched twice independently. Used as defaults below; overridable per-build via env
+ * in case Circle ever rotates an issuer.
+ */
+const DEFAULT_CCTP_USDC_ISSUER_TESTNET = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const DEFAULT_CCTP_USDC_ISSUER_MAINNET = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
 
 const extra = Constants.expoConfig?.extra ?? {};
 
@@ -50,8 +63,27 @@ export const appConfig: AppConfig = {
     typeof extra.cavosAppSalt === "string"
       ? extra.cavosAppSalt
       : "geko-mobile",
+  cctpUsdcIssuerTestnet:
+    typeof process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_TESTNET === "string" &&
+    process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_TESTNET.length > 0
+      ? process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_TESTNET
+      : typeof extra.cctpUsdcIssuerTestnet === "string" && extra.cctpUsdcIssuerTestnet.length > 0
+        ? extra.cctpUsdcIssuerTestnet
+        : DEFAULT_CCTP_USDC_ISSUER_TESTNET,
+  cctpUsdcIssuerMainnet:
+    typeof process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_MAINNET === "string" &&
+    process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_MAINNET.length > 0
+      ? process.env.EXPO_PUBLIC_CCTP_USDC_ISSUER_MAINNET
+      : typeof extra.cctpUsdcIssuerMainnet === "string" && extra.cctpUsdcIssuerMainnet.length > 0
+        ? extra.cctpUsdcIssuerMainnet
+        : DEFAULT_CCTP_USDC_ISSUER_MAINNET,
   environment: toEnvironment(extra.environment),
   requestTimeoutMs:
     typeof extra.requestTimeoutMs === "number" ? extra.requestTimeoutMs : 15000,
-  stellarNetwork: toStellarNetwork(extra.stellarNetwork),
+  stellarNetwork: toStellarNetwork(
+    typeof process.env.EXPO_PUBLIC_STELLAR_NETWORK === "string" &&
+      process.env.EXPO_PUBLIC_STELLAR_NETWORK.length > 0
+      ? process.env.EXPO_PUBLIC_STELLAR_NETWORK
+      : extra.stellarNetwork
+  ),
 };

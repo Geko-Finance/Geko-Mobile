@@ -1,6 +1,5 @@
 import { useRouter } from "expo-router";
 import { ArrowUpRight, ChevronRight, Globe, QrCode } from "lucide-react-native";
-import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -11,7 +10,6 @@ import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 export function SendOptionsScreen() {
   const router = useRouter();
   const activeAccount = useActiveAccount();
-  const [showChainsComingSoon, setShowChainsComingSoon] = useState(false);
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -45,8 +43,8 @@ export function SendOptionsScreen() {
           </Pressable>
 
           <Pressable
-            className="flex-1 rounded-[20px] bg-[#121214] px-4 py-5 opacity-50"
-            onPress={() => setShowChainsComingSoon(true)}
+            className="flex-1 rounded-[20px] bg-[#121214] px-4 py-5"
+            onPress={() => router.push("/cctp")}
           >
             <View className="h-9 w-9 items-center justify-center rounded-full bg-[#1E1E20]">
               <Globe color="#8E8E92" size={18} strokeWidth={2.5} />
@@ -55,21 +53,10 @@ export function SendOptionsScreen() {
               Other{"\n"}chains
             </Text>
             <Text className="mt-1 text-[13px] font-semibold text-[#8E8E92]">
-              Coming soon
+              USDC via CCTP
             </Text>
           </Pressable>
         </View>
-
-        {showChainsComingSoon ? (
-          <Pressable
-            className="mt-3 rounded-xl bg-[#1E1E20] px-4 py-3"
-            onPress={() => setShowChainsComingSoon(false)}
-          >
-            <Text className="text-[13px] font-semibold text-[#8E8E92]">
-              Other chains are coming soon.
-            </Text>
-          </Pressable>
-        ) : null}
 
         <View className="mt-6 overflow-hidden rounded-[20px] bg-[#121214]">
           <Pressable

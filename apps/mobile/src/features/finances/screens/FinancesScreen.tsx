@@ -2,9 +2,7 @@ import {
   ArrowDown,
   Bell,
   ChevronDown,
-  CircleDollarSign,
   Grid2X2,
-  PiggyBank,
   Repeat2,
   Send,
   TrendingDown,
@@ -16,16 +14,19 @@ import { LineChart } from "react-native-gifted-charts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  formatMoney,
-  getChartSeries,
-  getFilteredTransactions,
-  getFinanceSummary,
+  isWithinPeriod,
+  useFinanceChartSeries,
+  useFinanceEntries,
+  useFinanceSummary,
+  type FinanceEntry,
   type FinancePeriod,
-  type FinanceTransaction,
   type StatisticMetric,
   type TransactionFilter,
-} from "@/src/features/finances/data/mock-finance-data";
+} from "@/src/features/finances/api/finance-queries";
 import { TransactionRow } from "@/src/features/home/components/TransactionRow";
+import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
+import { Skeleton } from "@/src/features/shared/components/ui/skeleton";
+import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 
 type ChartPoint = { value: number };
 type ChartPointer = {
@@ -44,6 +45,13 @@ const CHART_Y_AXIS_TEXT_STYLE = {
   fontSize: 13,
   fontWeight: "700" as const,
 };
+
+const DEFAULT_CHART_DATA: ChartPoint[] = [
+  { value: 0 },
+  { value: 0 },
+  { value: 0 },
+  { value: 0 },
+];
 
 const METRIC_COLORS: Record<StatisticMetric, string> = {
   cashFlow: "#087BFF",
@@ -65,281 +73,10 @@ const PERIOD_OPTIONS: { label: string; value: FinancePeriod }[] = [
   { label: "Year", value: "year" },
 ];
 
-export const CHART_BY_METRIC: Record<
-  StatisticMetric,
-  Record<FinancePeriod, ChartPoint[]>
-> = {
-  cashFlow: {
-    today: [
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 30 },
-    ],
-    week: [
-      { value: 420 },
-      { value: 310 },
-      { value: 560 },
-      { value: 740 },
-      { value: 910 },
-      { value: 1180 },
-      { value: 1050 },
-      { value: 1320 },
-      { value: 1540 },
-      { value: 1840 },
-    ],
-    month: [
-      { value: 820 },
-      { value: 1160 },
-      { value: 1580 },
-      { value: 2100 },
-      { value: 2480 },
-      { value: 2910 },
-      { value: 3280 },
-      { value: 3720 },
-      { value: 3980 },
-      { value: 4280 },
-    ],
-    year: [
-      { value: 4200 },
-      { value: 6800 },
-      { value: 9200 },
-      { value: 11700 },
-      { value: 15100 },
-      { value: 18400 },
-      { value: 21100 },
-      { value: 24600 },
-      { value: 28900 },
-      { value: 32700 },
-      { value: 35600 },
-      { value: 38900 },
-    ],
-  },
-  expenseTrend: {
-    today: [
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-    ],
-    week: [
-      { value: 4 },
-      { value: 6 },
-      { value: 7 },
-      { value: 5 },
-      { value: 9 },
-      { value: 11 },
-      { value: 10 },
-      { value: 8 },
-    ],
-    month: [
-      { value: 7 },
-      { value: 9 },
-      { value: 12 },
-      { value: 15 },
-      { value: 13 },
-      { value: 16 },
-      { value: 18 },
-    ],
-    year: [
-      { value: 10 },
-      { value: 9 },
-      { value: 8 },
-      { value: 7 },
-      { value: 8 },
-      { value: 6 },
-    ],
-  },
-  expenses: {
-    today: [
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-    ],
-    week: [
-      { value: 160 },
-      { value: 260 },
-      { value: 420 },
-      { value: 610 },
-      { value: 760 },
-      { value: 970 },
-      { value: 1180 },
-      { value: 1420 },
-    ],
-    month: [
-      { value: 520 },
-      { value: 840 },
-      { value: 1210 },
-      { value: 1690 },
-      { value: 2150 },
-      { value: 2710 },
-      { value: 3120 },
-      { value: 3760 },
-    ],
-    year: [
-      { value: 3200 },
-      { value: 6100 },
-      { value: 9200 },
-      { value: 12800 },
-      { value: 16600 },
-      { value: 20800 },
-      { value: 24900 },
-      { value: 29100 },
-      { value: 33400 },
-      { value: 37900 },
-      { value: 42100 },
-    ],
-  },
-  income: {
-    today: [
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 0 },
-      { value: 30 },
-    ],
-    week: [
-      { value: 420 },
-      { value: 760 },
-      { value: 1180 },
-      { value: 1480 },
-      { value: 1920 },
-      { value: 2380 },
-      { value: 2860 },
-      { value: 3260 },
-    ],
-    month: [
-      { value: 960 },
-      { value: 1680 },
-      { value: 2520 },
-      { value: 3380 },
-      { value: 4210 },
-      { value: 5160 },
-      { value: 6120 },
-      { value: 7040 },
-      { value: 8040 },
-    ],
-    year: [
-      { value: 6200 },
-      { value: 11800 },
-      { value: 18400 },
-      { value: 24600 },
-      { value: 31200 },
-      { value: 38900 },
-      { value: 46800 },
-      { value: 55200 },
-      { value: 63700 },
-      { value: 72100 },
-      { value: 81000 },
-    ],
-  },
-};
-
-export const STATISTICS: Record<
-  FinancePeriod,
-  {
-    cashFlow: string;
-    expenseDelta: string;
-    expenses: string;
-    income: string;
-  }
-> = {
-  today: {
-    cashFlow: "+$30.00",
-    expenseDelta: "0% today",
-    expenses: "$0.00",
-    income: "$30.00",
-  },
-  week: {
-    cashFlow: "+$1,840.00",
-    expenseDelta: "8% more than last week",
-    expenses: "$1,420.00",
-    income: "$3,260.00",
-  },
-  month: {
-    cashFlow: "+$4,280.00",
-    expenseDelta: "18% more than last month",
-    expenses: "$3,760.00",
-    income: "$8,040.00",
-  },
-  year: {
-    cashFlow: "+$38,900.00",
-    expenseDelta: "6% less than last year",
-    expenses: "$42,100.00",
-    income: "$81,000.00",
-  },
-};
-
-export const TRANSACTIONS = [
-  {
-    amount: "+$30,00",
-    amountTone: "green" as const,
-    icon: Repeat2,
-    meta: "Today - 6:22 AM",
-    period: "today" as const,
-    title: "Jose Sanchez",
-  },
-  {
-    amount: "$450,00",
-    amountTone: "yellow" as const,
-    icon: PiggyBank,
-    meta: "Yesterday - 12:31 PM",
-    period: "week" as const,
-    title: "Mexico Trip Budget",
-  },
-  {
-    amount: "-$145,00",
-    amountTone: "red" as const,
-    icon: Repeat2,
-    meta: "Nov 9 - 15:01 PM",
-    period: "week" as const,
-    title: "Christmas Gift",
-  },
-  {
-    amount: "+$50,00",
-    amountTone: "green" as const,
-    icon: Send,
-    meta: "Nov 4 - 12:31 PM",
-    period: "month" as const,
-    title: "Salary Bonus",
-  },
-  {
-    amount: "+$150,20",
-    amountTone: "green" as const,
-    icon: ArrowDown,
-    meta: "Nov 2 - 9:15 AM",
-    period: "month" as const,
-    title: "Freelance Project",
-  },
-  {
-    amount: "-$32,80",
-    amountTone: "red" as const,
-    icon: CircleDollarSign,
-    meta: "Oct 31 - 8:04 PM",
-    period: "year" as const,
-    title: "Coffee & Snacks",
-  },
-  {
-    amount: "+$920,00",
-    amountTone: "green" as const,
-    icon: ArrowDown,
-    meta: "Oct 29 - 10:00 AM",
-    period: "year" as const,
-    title: "Payroll Deposit",
-  },
-];
+function formatXlm(value: number, options?: { signed?: boolean }): string {
+  const sign = options?.signed && value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${Math.abs(value).toFixed(2)} XLM`;
+}
 
 function PeriodSelector({
   onChange,
@@ -425,13 +162,6 @@ function getChartMaxValue(data: ChartPoint[]) {
   return Math.ceil((maxValue * 1.18) / magnitude) * magnitude;
 }
 
-function formatCurrency(value: number) {
-  return `$${value.toLocaleString("en-US", {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
-  })}.00`;
-}
-
 function formatCompactValue(value: number, metric: StatisticMetric) {
   if (metric === "expenseTrend") {
     return `${Math.round(value)}%`;
@@ -449,7 +179,7 @@ function formatBubbleValue(value: number, metric: StatisticMetric) {
     return `${Math.round(value)}%`;
   }
 
-  return formatCurrency(value);
+  return formatXlm(value);
 }
 
 function getPointerPosition({
@@ -472,78 +202,52 @@ function getPointerPosition({
   };
 }
 
-function getTransactionIcon(transaction: FinanceTransaction) {
-  if (transaction.type === "income") {
-    return transaction.category === "Transfers" ? Repeat2 : ArrowDown;
-  }
+function toFinanceEntryRowProps(entry: FinanceEntry) {
+  const title =
+    entry.crossBorder || entry.counterparty === null
+      ? "Cross-border transfer"
+      : `${entry.counterparty.slice(0, 4)}…${entry.counterparty.slice(-4)}`;
 
-  if (transaction.category === "Travel" || transaction.category === "Housing") {
-    return PiggyBank;
-  }
+  const dateStr = new Date(entry.createdAt).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const meta = entry.pending ? `Processing · ${dateStr}` : dateStr;
 
-  if (transaction.category === "Dining" || transaction.category === "Shopping") {
-    return CircleDollarSign;
-  }
+  const amount =
+    entry.amountXlm === null
+      ? "Pending"
+      : formatXlm(
+          Number(entry.amountXlm) * (entry.type === "received" ? 1 : -1),
+          { signed: true }
+        );
 
-  return Send;
-}
-
-function toTransactionRowProps(transaction: FinanceTransaction) {
-  const signedAmount =
-    transaction.type === "income" ? transaction.amount : -transaction.amount;
-  const amountTone =
-    transaction.type === "income"
+  const amountTone = entry.pending
+    ? ("yellow" as const)
+    : entry.type === "received"
       ? ("green" as const)
-      : transaction.category === "Travel"
-        ? ("yellow" as const)
-        : ("red" as const);
+      : ("red" as const);
+
+  const icon = entry.crossBorder
+    ? Repeat2
+    : entry.type === "received"
+      ? ArrowDown
+      : Send;
 
   return {
-    amount: formatMoney(signedAmount, { signed: true }),
+    amount,
     amountTone,
-    icon: getTransactionIcon(transaction),
-    meta: transaction.meta,
-    title: transaction.title,
+    icon,
+    meta,
+    title,
   };
-}
-
-export function visibleByPeriod(period: FinancePeriod) {
-  return TRANSACTIONS.filter((transaction) => {
-    if (period === "year") {
-      return true;
-    }
-
-    if (period === "month") {
-      return transaction.period !== "year";
-    }
-
-    if (period === "week") {
-      return transaction.period === "today" || transaction.period === "week";
-    }
-
-    return transaction.period === "today";
-  });
-}
-
-export function visibleByTransactionFilter(
-  transactions: typeof TRANSACTIONS,
-  filter: TransactionFilter
-) {
-  if (filter === "all") {
-    return transactions;
-  }
-
-  return transactions.filter((transaction) => {
-    if (filter === "income") {
-      return transaction.amount.startsWith("+");
-    }
-
-    return transaction.amount.startsWith("-");
-  });
 }
 
 export function FinancesScreen() {
   const insets = useSafeAreaInsets();
+  const activeAccount = useActiveAccount();
   const [statisticsPeriod, setStatisticsPeriod] =
     useState<FinancePeriod>("today");
   const [selectedMetric, setSelectedMetric] =
@@ -553,21 +257,37 @@ export function FinancesScreen() {
   const [transactionFilter, setTransactionFilter] =
     useState<TransactionFilter>("all");
   const [isTransactionFilterOpen, setIsTransactionFilterOpen] = useState(false);
+  const summaryQuery = useFinanceSummary(statisticsPeriod);
+  const chartQuery = useFinanceChartSeries(selectedMetric, statisticsPeriod);
+  const entriesQuery = useFinanceEntries();
+  const isLoading =
+    summaryQuery.isLoading || chartQuery.isLoading || entriesQuery.isLoading;
+  const isError =
+    summaryQuery.isError || chartQuery.isError || entriesQuery.isError;
   const screenWidth = Dimensions.get("window").width;
   const chartCardWidth = screenWidth - 40;
   const chartWidth = Math.max(chartCardWidth - 82, 240);
-  const statistics = useMemo(
-    () => getFinanceSummary(statisticsPeriod),
-    [statisticsPeriod]
-  );
-  const transactions = useMemo(
-    () => getFilteredTransactions(transactionsPeriod, transactionFilter),
-    [transactionFilter, transactionsPeriod]
-  );
-  const chartData = useMemo(
-    () => getChartSeries(selectedMetric, statisticsPeriod),
-    [selectedMetric, statisticsPeriod]
-  );
+  const statistics = summaryQuery.data;
+  const transactions = useMemo(() => {
+    if (entriesQuery.data === undefined) {
+      return [];
+    }
+
+    return entriesQuery.data
+      .filter((entry) => isWithinPeriod(entry.createdAt, transactionsPeriod))
+      .filter((entry) => {
+        if (transactionFilter === "all") {
+          return true;
+        }
+
+        if (transactionFilter === "income") {
+          return entry.type === "received";
+        }
+
+        return entry.type === "sent";
+      });
+  }, [entriesQuery.data, transactionFilter, transactionsPeriod]);
+  const chartData = chartQuery.data ?? DEFAULT_CHART_DATA;
   const chartColor = METRIC_COLORS[selectedMetric];
   const chartMaxValue = useMemo(() => getChartMaxValue(chartData), [chartData]);
   const yAxisLabelTexts = useMemo(
@@ -671,6 +391,13 @@ export function FinancesScreen() {
     },
     []
   );
+  const handleRetry = useCallback(() => {
+    void Promise.all([
+      summaryQuery.refetch(),
+      chartQuery.refetch(),
+      entriesQuery.refetch(),
+    ]);
+  }, [chartQuery, entriesQuery, summaryQuery]);
 
   return (
     <View className="flex-1 bg-black">
@@ -685,200 +412,263 @@ export function FinancesScreen() {
           <Bell color="#8E8E92" fill="#8E8E92" size={25} strokeWidth={2.5} />
         </View>
 
-        <View className="flex-row items-center justify-between">
-          <Text className="text-[29px] font-extrabold text-[#A6A6A8]">
-            Statistics
-          </Text>
-          <View className="flex-row items-center">
-            <Text className="text-[20px] font-bold text-[#77777B]">All</Text>
-            <ChevronDown color="#77777B" size={19} strokeWidth={3} />
-          </View>
-        </View>
-
-        <View className="mt-4">
-          <PeriodSelector
-            onChange={setStatisticsPeriod}
-            value={statisticsPeriod}
+        {!activeAccount ? (
+          <ScreenPlaceholder
+            description="Add or create a wallet to see your balances and activity."
+            eyebrow="App"
+            title="Finances"
           />
-        </View>
-
-        <View className="relative mt-4 rounded-[20px] bg-[#141416] px-3 pb-5 pt-14">
-          <View
-            pointerEvents="none"
-            className="absolute z-10 w-[142px] rounded-[14px] px-3.5 py-3"
-            style={{ backgroundColor: chartColor, left: bubbleLeft, top: bubbleTop }}
-          >
-            <Text className="text-center text-[14px] font-extrabold text-[#06101B]">
-              {formatBubbleValue(activeValue, selectedMetric)}
-            </Text>
-          </View>
-
-          <LineChart
-            key={`${selectedMetric}-${statisticsPeriod}`}
-            animateOnDataChange
-            animationDuration={850}
-            areaChart
-            color={chartColor}
-            curved
-            data={chartData}
-            dataPointsColor={chartColor}
-            dataPointsHeight={7}
-            dataPointsWidth={7}
-            disableScroll
-            endFillColor={chartColor}
-            endOpacity={0.02}
-            endSpacing={CHART_END_SPACING}
-            getPointerProps={handlePointerChange}
-            height={CHART_HEIGHT}
-            hideDataPoints
-            initialSpacing={CHART_INITIAL_SPACING}
-            isAnimated
-            maxValue={chartMaxValue}
-            noOfSections={5}
-            overflowTop={72}
-            pointerConfig={pointerConfig}
-            rulesColor="#303033"
-            rulesLength={chartWidth}
-            rulesType="solid"
-            spacing={chartSpacing}
-            startFillColor={chartColor}
-            startOpacity={0.36}
-            thickness={3}
-            width={chartWidth}
-            xAxisColor="transparent"
-            yAxisColor="transparent"
-            yAxisLabelWidth={CHART_Y_AXIS_LABEL_WIDTH}
-            yAxisLabelTexts={yAxisLabelTexts}
-            yAxisTextStyle={CHART_Y_AXIS_TEXT_STYLE}
-          />
-        </View>
-
-        <View className="mt-4 flex-row gap-2.5">
-          <StatCard
-            isSelected={selectedMetric === "income"}
-            label="Income"
-            onPress={() => setSelectedMetric("income")}
-            tone="green"
-            value={formatMoney(statistics.income)}
-          />
-          <StatCard
-            isSelected={selectedMetric === "expenses"}
-            label="Expenses"
-            onPress={() => setSelectedMetric("expenses")}
-            tone="red"
-            value={formatMoney(statistics.expenses)}
-          />
-        </View>
-        <View className="mt-2.5 flex-row gap-2.5">
-          <StatCard
-            isSelected={selectedMetric === "cashFlow"}
-            label="Cash flow"
-            onPress={() => setSelectedMetric("cashFlow")}
-            tone="blue"
-            value={formatMoney(statistics.cashFlow, { signed: true })}
-          />
-          <StatCard
-            isSelected={selectedMetric === "expenseTrend"}
-            label="Expense trend"
-            onPress={() => setSelectedMetric("expenseTrend")}
-            tone={
-              statistics.expenseDeltaLabel.includes("more") ? "yellow" : "green"
-            }
-            value={statistics.expenseDeltaLabel}
-          />
-        </View>
-
-        <View className="mt-6">
-          <PeriodSelector
-            onChange={setTransactionsPeriod}
-            value={transactionsPeriod}
-          />
-        </View>
-
-        <View className="mt-6 flex-row items-center justify-between">
-          <Text className="text-[29px] font-extrabold text-[#A6A6A8]">
-            Transactions
-          </Text>
-          <View className="relative items-end">
-            <Pressable
-              accessibilityRole="button"
-              className="flex-row items-center"
-              onPress={() =>
-                setIsTransactionFilterOpen((currentValue) => !currentValue)
-              }
-            >
-              <Text className="text-[20px] font-bold text-[#77777B]">
-                {TRANSACTION_FILTER_LABELS[transactionFilter]}
+        ) : (
+          <>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[29px] font-extrabold text-[#A6A6A8]">
+                Statistics
               </Text>
-              <ChevronDown color="#77777B" size={19} strokeWidth={3} />
-            </Pressable>
-
-            {isTransactionFilterOpen ? (
-              <View className="absolute right-0 top-9 z-20 w-[132px] overflow-hidden rounded-[14px] border border-white/10 bg-[#1D1D1F]">
-                {(["all", "expenses", "income"] as TransactionFilter[]).map(
-                  (filter) => {
-                    const isSelected = transactionFilter === filter;
-
-                    return (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: isSelected }}
-                        className={`px-4 py-3 ${
-                          isSelected ? "bg-[#242426]" : "bg-transparent"
-                        }`}
-                        key={filter}
-                        onPress={() => {
-                          setTransactionFilter(filter);
-                          setIsTransactionFilterOpen(false);
-                        }}
-                      >
-                        <Text
-                          className={`text-[14px] font-bold ${
-                            isSelected ? "text-white" : "text-[#9D9D9F]"
-                          }`}
-                        >
-                          {TRANSACTION_FILTER_LABELS[filter]}
-                        </Text>
-                      </Pressable>
-                    );
-                  }
-                )}
+              <View className="flex-row items-center">
+                <Text className="text-[20px] font-bold text-[#77777B]">All</Text>
+                <ChevronDown color="#77777B" size={19} strokeWidth={3} />
               </View>
-            ) : null}
-          </View>
-        </View>
-
-        <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214]">
-          {transactions.length > 0 ? (
-            transactions.map((transaction) => (
-              <TransactionRow
-                key={transaction.id}
-                {...toTransactionRowProps(transaction)}
-              />
-            ))
-          ) : (
-            <View className="items-center justify-center px-5 py-10">
-              <Text className="text-[15px] font-bold text-[#77777B]">
-                No hay transacciones
-              </Text>
             </View>
-          )}
-        </View>
 
-        <View className="mt-5 flex-row gap-2.5">
-          <View className="flex-1 flex-row items-center rounded-[16px] bg-[#141416] px-4 py-4">
-            <TrendingUp color="#5BED97" size={20} strokeWidth={2.6} />
-            <Text className="ml-2 text-[13px] font-bold text-[#D8D8DC]">
-              Income is trending up
-            </Text>
-          </View>
-          <View className="flex-1 flex-row items-center rounded-[16px] bg-[#141416] px-4 py-4">
-            <TrendingDown color="#F2CB63" size={20} strokeWidth={2.6} />
-            <Text className="ml-2 text-[13px] font-bold text-[#D8D8DC]">
-              Spending needs review
-            </Text>
-          </View>
-        </View>
+            <View className="mt-4">
+              <PeriodSelector
+                onChange={setStatisticsPeriod}
+                value={statisticsPeriod}
+              />
+            </View>
+
+            {isLoading ? (
+              <>
+                <Skeleton
+                  className="mt-4 h-[220px] rounded-[20px]"
+                  startColor="bg-[#242426]"
+                />
+                <View className="mt-4 flex-row gap-2.5">
+                  <Skeleton
+                    className="h-[78px] flex-1 rounded-[16px]"
+                    startColor="bg-[#242426]"
+                  />
+                  <Skeleton
+                    className="h-[78px] flex-1 rounded-[16px]"
+                    startColor="bg-[#242426]"
+                  />
+                </View>
+                <View className="mt-2.5 flex-row gap-2.5">
+                  <Skeleton
+                    className="h-[78px] flex-1 rounded-[16px]"
+                    startColor="bg-[#242426]"
+                  />
+                  <Skeleton
+                    className="h-[78px] flex-1 rounded-[16px]"
+                    startColor="bg-[#242426]"
+                  />
+                </View>
+              </>
+            ) : isError ? (
+              <View className="mt-4 flex-row items-center justify-center gap-3">
+                <Text className="text-[15px] font-semibold text-[#77777B]">
+                  Couldn&apos;t load your finances
+                </Text>
+                <Pressable accessibilityRole="button" onPress={handleRetry}>
+                  <Text className="text-[15px] font-semibold text-[#087BFF]">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <View className="relative mt-4 rounded-[20px] bg-[#141416] px-3 pb-5 pt-14">
+                  <View
+                    pointerEvents="none"
+                    className="absolute z-10 w-[142px] rounded-[14px] px-3.5 py-3"
+                    style={{
+                      backgroundColor: chartColor,
+                      left: bubbleLeft,
+                      top: bubbleTop,
+                    }}
+                  >
+                    <Text className="text-center text-[14px] font-extrabold text-[#06101B]">
+                      {formatBubbleValue(activeValue, selectedMetric)}
+                    </Text>
+                  </View>
+
+                  <LineChart
+                    key={`${selectedMetric}-${statisticsPeriod}`}
+                    animateOnDataChange
+                    animationDuration={850}
+                    areaChart
+                    color={chartColor}
+                    curved
+                    data={chartData}
+                    dataPointsColor={chartColor}
+                    dataPointsHeight={7}
+                    dataPointsWidth={7}
+                    disableScroll
+                    endFillColor={chartColor}
+                    endOpacity={0.02}
+                    endSpacing={CHART_END_SPACING}
+                    getPointerProps={handlePointerChange}
+                    height={CHART_HEIGHT}
+                    hideDataPoints
+                    initialSpacing={CHART_INITIAL_SPACING}
+                    isAnimated
+                    maxValue={chartMaxValue}
+                    noOfSections={5}
+                    overflowTop={72}
+                    pointerConfig={pointerConfig}
+                    rulesColor="#303033"
+                    rulesLength={chartWidth}
+                    rulesType="solid"
+                    spacing={chartSpacing}
+                    startFillColor={chartColor}
+                    startOpacity={0.36}
+                    thickness={3}
+                    width={chartWidth}
+                    xAxisColor="transparent"
+                    yAxisColor="transparent"
+                    yAxisLabelWidth={CHART_Y_AXIS_LABEL_WIDTH}
+                    yAxisLabelTexts={yAxisLabelTexts}
+                    yAxisTextStyle={CHART_Y_AXIS_TEXT_STYLE}
+                  />
+                </View>
+
+                <View className="mt-4 flex-row gap-2.5">
+                  <StatCard
+                    isSelected={selectedMetric === "income"}
+                    label="Income"
+                    onPress={() => setSelectedMetric("income")}
+                    tone="green"
+                    value={formatXlm(statistics?.income ?? 0)}
+                  />
+                  <StatCard
+                    isSelected={selectedMetric === "expenses"}
+                    label="Expenses"
+                    onPress={() => setSelectedMetric("expenses")}
+                    tone="red"
+                    value={formatXlm(statistics?.expenses ?? 0)}
+                  />
+                </View>
+                <View className="mt-2.5 flex-row gap-2.5">
+                  <StatCard
+                    isSelected={selectedMetric === "cashFlow"}
+                    label="Cash flow"
+                    onPress={() => setSelectedMetric("cashFlow")}
+                    tone="blue"
+                    value={formatXlm(statistics?.cashFlow ?? 0, { signed: true })}
+                  />
+                  <StatCard
+                    isSelected={selectedMetric === "expenseTrend"}
+                    label="Expense trend"
+                    onPress={() => setSelectedMetric("expenseTrend")}
+                    tone={
+                      statistics?.expenseDeltaLabel?.includes("more")
+                        ? "yellow"
+                        : "green"
+                    }
+                    value={statistics?.expenseDeltaLabel ?? "0% today"}
+                  />
+                </View>
+              </>
+            )}
+
+            <View className="mt-6">
+              <PeriodSelector
+                onChange={setTransactionsPeriod}
+                value={transactionsPeriod}
+              />
+            </View>
+
+            <View className="mt-6 flex-row items-center justify-between">
+              <Text className="text-[29px] font-extrabold text-[#A6A6A8]">
+                Transactions
+              </Text>
+              <View className="relative items-end">
+                <Pressable
+                  accessibilityRole="button"
+                  className="flex-row items-center"
+                  onPress={() =>
+                    setIsTransactionFilterOpen((currentValue) => !currentValue)
+                  }
+                >
+                  <Text className="text-[20px] font-bold text-[#77777B]">
+                    {TRANSACTION_FILTER_LABELS[transactionFilter]}
+                  </Text>
+                  <ChevronDown color="#77777B" size={19} strokeWidth={3} />
+                </Pressable>
+
+                {isTransactionFilterOpen ? (
+                  <View className="absolute right-0 top-9 z-20 w-[132px] overflow-hidden rounded-[14px] border border-white/10 bg-[#1D1D1F]">
+                    {(["all", "expenses", "income"] as TransactionFilter[]).map(
+                      (filter) => {
+                        const isSelected = transactionFilter === filter;
+
+                        return (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
+                            className={`px-4 py-3 ${
+                              isSelected ? "bg-[#242426]" : "bg-transparent"
+                            }`}
+                            key={filter}
+                            onPress={() => {
+                              setTransactionFilter(filter);
+                              setIsTransactionFilterOpen(false);
+                            }}
+                          >
+                            <Text
+                              className={`text-[14px] font-bold ${
+                                isSelected ? "text-white" : "text-[#9D9D9F]"
+                              }`}
+                            >
+                              {TRANSACTION_FILTER_LABELS[filter]}
+                            </Text>
+                          </Pressable>
+                        );
+                      }
+                    )}
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214]">
+              {isLoading ? (
+                <Skeleton
+                  className="h-[120px] rounded-[20px]"
+                  startColor="bg-[#242426]"
+                />
+              ) : transactions.length > 0 ? (
+                transactions.map((transaction) => (
+                  <TransactionRow
+                    key={transaction.id}
+                    {...toFinanceEntryRowProps(transaction)}
+                  />
+                ))
+              ) : (
+                <View className="items-center justify-center px-5 py-10">
+                  <Text className="text-[15px] font-bold text-[#77777B]">
+                    No hay transacciones
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View className="mt-5 flex-row gap-2.5">
+              <View className="flex-1 flex-row items-center rounded-[16px] bg-[#141416] px-4 py-4">
+                <TrendingUp color="#5BED97" size={20} strokeWidth={2.6} />
+                <Text className="ml-2 text-[13px] font-bold text-[#D8D8DC]">
+                  Income is trending up
+                </Text>
+              </View>
+              <View className="flex-1 flex-row items-center rounded-[16px] bg-[#141416] px-4 py-4">
+                <TrendingDown color="#F2CB63" size={20} strokeWidth={2.6} />
+                <Text className="ml-2 text-[13px] font-bold text-[#D8D8DC]">
+                  Spending needs review
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );

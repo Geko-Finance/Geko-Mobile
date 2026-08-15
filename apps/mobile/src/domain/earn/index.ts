@@ -1,2 +1,2 @@
 export type { Vault } from "./vault";
-export { KNOWN_VAULTS } from "./vault";
+export { getKnownVaultsForNetwork, KNOWN_VAULTS } from "./vault";

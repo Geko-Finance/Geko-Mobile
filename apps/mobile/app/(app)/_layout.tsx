@@ -62,6 +62,7 @@ export default function AppLayout() {
       <Stack.Screen name="payments/success" />
       <Stack.Screen name="cctp/index" />
       <Stack.Screen name="cctp/status" />
+      <Stack.Screen name="invest/[vaultId]" />
       <Stack.Screen name="multisig/index" />
       <Stack.Screen name="multisig/add-signer" />
       <Stack.Screen name="multisig/edit-thresholds" />

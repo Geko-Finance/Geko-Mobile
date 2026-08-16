@@ -50,6 +50,15 @@ export class WalletsService {
     const provisioned = await provider.provisionWallet(input);
 
     const existing = await this.walletsRepository.findAllForUser(userId);
+
+    const alreadyProvisioned = existing.find(
+      (wallet) => wallet.publicAddress === provisioned.publicAddress,
+    );
+
+    if (alreadyProvisioned) {
+      return { wallet: alreadyProvisioned };
+    }
+
     const isPrimary = existing.length === 0;
 
     const wallet = await this.walletsRepository.create({

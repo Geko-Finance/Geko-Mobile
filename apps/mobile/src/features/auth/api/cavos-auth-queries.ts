@@ -43,7 +43,14 @@ export function useSocialLogin(provider: OAuthProvider) {
         throw new OAuthCancelledError();
       }
 
-      return completeOAuthCallback(result.url, provider);
+      const { queryParams } = Linking.parse(result.url);
+      const authData = queryParams?.auth_data;
+
+      if (typeof authData !== "string") {
+        throw new Error("OAuth callback did not include auth_data");
+      }
+
+      return completeOAuthCallback(authData, provider);
     },
   });
 }

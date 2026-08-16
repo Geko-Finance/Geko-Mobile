@@ -5,7 +5,8 @@ NestJS API for the Geko wallet. This workspace is scaffold-only; auth, wallets, 
 ## Prerequisites
 
 - Node.js 20+
-- Docker (for local Postgres)
+- Docker (for local Postgres via the Supabase CLI)
+- Supabase CLI (`brew install supabase/tap/supabase` or see https://supabase.com/docs/guides/cli/getting-started)
 
 ## Setup
 
@@ -15,11 +16,21 @@ NestJS API for the Geko wallet. This workspace is scaffold-only; auth, wallets, 
    cp .env.example .env
    ```
 
-2. Start local Postgres:
+2. Start the local Supabase Postgres stack (only the `db` container; auth, storage, studio, and other services are excluded):
+
+   From the repo root (also runs automatically as part of `npm run dev`):
 
    ```bash
-   docker compose up -d
+   npm run supabase:start
    ```
+
+   Or from this directory:
+
+   ```bash
+   supabase start --exclude edge-runtime,gotrue,imgproxy,kong,logflare,mailpit,postgres-meta,postgrest,realtime,storage-api,studio,supavisor,vector --yes
+   ```
+
+   To tear the stack down: `supabase stop` (or `npm run supabase:stop` from the repo root).
 
 3. Install dependencies from the monorepo root (if you have not already):
 

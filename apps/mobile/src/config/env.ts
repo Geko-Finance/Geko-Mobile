@@ -12,6 +12,8 @@ interface AppConfig {
   cctpUsdcIssuerTestnet: string;
   /** Circle's USDC issuer (G...) on Stellar mainnet - see src/services/api/cctp/cctp-config.ts. */
   cctpUsdcIssuerMainnet: string;
+  stellarTestnetRpcUrl: string;
+  stellarMainnetRpcUrl: string;
   environment: AppEnvironment;
   requestTimeoutMs: number;
   stellarNetwork: StellarNetworkId;
@@ -25,6 +27,12 @@ interface AppConfig {
  */
 const DEFAULT_CCTP_USDC_ISSUER_TESTNET = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 const DEFAULT_CCTP_USDC_ISSUER_MAINNET = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
+
+/** Public Soroban RPC endpoints (see apps/mobile/src/services/api/stellar/stellar-config.ts for
+ * where these are consumed). The mainnet one is a shared/rate-limited public provider - swap for
+ * a dedicated one via EXPO_PUBLIC_STELLAR_MAINNET_RPC_URL before real mainnet traffic. */
+const DEFAULT_STELLAR_TESTNET_RPC_URL = "https://soroban-testnet.stellar.org";
+const DEFAULT_STELLAR_MAINNET_RPC_URL = "https://mainnet.sorobanrpc.com";
 
 const extra = Constants.expoConfig?.extra ?? {};
 
@@ -77,6 +85,20 @@ export const appConfig: AppConfig = {
       : typeof extra.cctpUsdcIssuerMainnet === "string" && extra.cctpUsdcIssuerMainnet.length > 0
         ? extra.cctpUsdcIssuerMainnet
         : DEFAULT_CCTP_USDC_ISSUER_MAINNET,
+  stellarTestnetRpcUrl:
+    typeof process.env.EXPO_PUBLIC_STELLAR_TESTNET_RPC_URL === "string" &&
+    process.env.EXPO_PUBLIC_STELLAR_TESTNET_RPC_URL.length > 0
+      ? process.env.EXPO_PUBLIC_STELLAR_TESTNET_RPC_URL
+      : typeof extra.stellarTestnetRpcUrl === "string" && extra.stellarTestnetRpcUrl.length > 0
+        ? extra.stellarTestnetRpcUrl
+        : DEFAULT_STELLAR_TESTNET_RPC_URL,
+  stellarMainnetRpcUrl:
+    typeof process.env.EXPO_PUBLIC_STELLAR_MAINNET_RPC_URL === "string" &&
+    process.env.EXPO_PUBLIC_STELLAR_MAINNET_RPC_URL.length > 0
+      ? process.env.EXPO_PUBLIC_STELLAR_MAINNET_RPC_URL
+      : typeof extra.stellarMainnetRpcUrl === "string" && extra.stellarMainnetRpcUrl.length > 0
+        ? extra.stellarMainnetRpcUrl
+        : DEFAULT_STELLAR_MAINNET_RPC_URL,
   environment: toEnvironment(extra.environment),
   requestTimeoutMs:
     typeof extra.requestTimeoutMs === "number" ? extra.requestTimeoutMs : 15000,

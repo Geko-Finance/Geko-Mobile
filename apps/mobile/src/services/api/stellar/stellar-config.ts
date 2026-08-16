@@ -31,15 +31,13 @@ export const STELLAR_NETWORKS: Record<StellarNetworkId, StellarNetworkConfig> = 
     horizonUrl: "https://horizon-testnet.stellar.org",
     networkPassphrase: TESTNET_NETWORK_PASSPHRASE,
     friendbotUrl: "https://friendbot.stellar.org",
-    rpcUrl: "https://soroban-testnet.stellar.org",
+    rpcUrl: appConfig.stellarTestnetRpcUrl,
   },
   mainnet: {
     id: "mainnet",
     horizonUrl: "https://horizon.stellar.org",
     networkPassphrase: PUBLIC_NETWORK_PASSPHRASE,
-    // Public provider from https://developers.stellar.org/docs/data/apis/rpc/providers;
-    // swap for a dedicated/paid provider before real mainnet traffic.
-    rpcUrl: "https://mainnet.sorobanrpc.com",
+    rpcUrl: appConfig.stellarMainnetRpcUrl,
   },
 };
 

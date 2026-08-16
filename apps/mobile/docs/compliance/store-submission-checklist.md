@@ -1,6 +1,6 @@
 # Store Submission Checklist
 
-> **DRAFT — for legal/product review before real submission. Not final copy.**
+> **DRAFT, for legal/product review before real submission. Not final copy.**
 
 Issue [#27](https://github.com/geko-mobile/Geko-Mobile/issues/27) · Pre-flight for `eas submit --profile production`
 
@@ -26,7 +26,7 @@ Replace all `REPLACE_WITH_*` placeholders before a real submit:
 | `appleId` | Apple ID email used for App Store Connect |
 | `ascAppId` | Numeric App Store Connect app ID |
 | `appleTeamId` | Apple Developer Team ID |
-| `serviceAccountKeyPath` | Upload JSON key via EAS secret — do **not** commit the key file |
+| `serviceAccountKeyPath` | Upload JSON key via EAS secret, do **not** commit the key file |
 
 ```bash
 # Example: store Android service account key as an EAS secret, then reference it in eas.json
@@ -54,12 +54,12 @@ Changing these after first public release requires a new store listing. Legal/pr
 |------|--------|-------|
 | App Store screenshots (6.7", 6.5", 5.5" iPhone; iPad if supporting tablet) | ☐ | `supportsTablet: true` in `app.json` |
 | Play Store screenshots (phone; 7" / 10" tablet if applicable) | ☐ | Feature graphic (1024×500) required |
-| App name, subtitle (iOS), short & full description (Play) | ☐ | Draft copy — legal review |
+| App name, subtitle (iOS), short & full description (Play) | ☐ | Draft copy (legal review) |
 | Keywords (iOS, 100 chars max) | ☐ | |
 | Support URL | ☐ | Must be live before review |
 | Marketing URL (optional) | ☐ | |
 | Privacy policy URL | ☐ | Host `privacy-policy-draft.md` final version at a public HTTPS URL |
-| App category & content rating questionnaire | ☐ | Fintech / crypto wallet — expect enhanced scrutiny |
+| App category & content rating questionnaire | ☐ | Fintech / crypto wallet - expect enhanced scrutiny |
 | Age rating | ☐ | |
 
 ---
@@ -74,12 +74,12 @@ Changing these after first public release requires a new store listing. Legal/pr
 
 ---
 
-## Export compliance — encryption (`ITSAppUsesNonExemptEncryption`)
+## Export compliance - encryption (`ITSAppUsesNonExemptEncryption`)
 
 | Item | Status | Notes |
 |------|--------|-------|
 | `ITSAppUsesNonExemptEncryption: false` in `app.json` | ☐ Re-verify with legal | App bundles Stellar wallet cryptography (`@stellar/stellar-base`, `@stellar/typescript-wallet-sdk-km`) and uses `expo-secure-store` / `expo-local-authentication` for on-device key protection |
-| Legal sign-off on exemption eligibility | ☐ | Standard crypto library usage *likely* qualifies for the Apple export-compliance exemption — **requires real legal sign-off, not an engineering assumption** |
+| Legal sign-off on exemption eligibility | ☐ | Standard crypto library usage *likely* qualifies for the Apple export-compliance exemption (**requires real legal sign-off, not an engineering assumption**) |
 | Annual self-classification report (if required) | ☐ | Confirm with counsel |
 
 Current setting in `apps/mobile/app.json`:
@@ -115,7 +115,7 @@ eas submit --profile production --platform android
 
 ---
 
-## Timeline — start store review in parallel
+## Timeline - start store review in parallel
 
 Crypto / fintech wallet apps face **wall-clock-bound** store review (often **days**, sometimes longer). Do **not** wait until engineering is finished.
 
@@ -130,4 +130,4 @@ Crypto / fintech wallet apps face **wall-clock-bound** store review (often **day
 
 ---
 
-> **DRAFT — for legal/product review before real submission. Not final copy.**
+> **DRAFT, for legal/product review before real submission. Not final copy.**

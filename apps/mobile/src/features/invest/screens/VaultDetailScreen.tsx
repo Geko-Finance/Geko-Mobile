@@ -183,7 +183,7 @@ export function VaultDetailScreen() {
         input: {
           vaultAddress: vault.id,
           amountsDesired: [parsedAmount],
-          amountsMin: [0n], // TODO: no slippage protection yet — must be added before mainnet/real funds
+          amountsMin: [0n], // TODO: no slippage protection yet - must be added before mainnet/real funds
           invest: false,
         },
         signer,
@@ -219,7 +219,7 @@ export function VaultDetailScreen() {
         input: {
           vaultAddress: vault.id,
           withdrawShares,
-          minAmountsOut: [0n], // TODO: no slippage protection yet — must be added before mainnet/real funds
+          minAmountsOut: [0n], // TODO: no slippage protection yet - must be added before mainnet/real funds
         },
         signer,
       },

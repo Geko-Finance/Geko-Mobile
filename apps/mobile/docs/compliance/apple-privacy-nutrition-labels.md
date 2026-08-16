@@ -1,6 +1,6 @@
 # Apple Privacy Nutrition Labels
 
-> **DRAFT — for legal/product review before App Store Connect submission. Not final copy.**
+> **DRAFT, for legal/product review before App Store Connect submission. Not final copy.**
 
 Maps data handled by Geko (per codebase) to [App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/) categories.
 
@@ -57,8 +57,8 @@ Data connected to the user's identity (account, device, or other identifiable li
 | Apple subcategory | Collected? | Purpose | Third-party sharing |
 |-------------------|------------|---------|---------------------|
 | Product interaction | Limited (audit log actions, session IP/user agent) | App functionality, fraud prevention | No |
-| Advertising data | No | — | — |
-| Other usage data | No analytics SDK | — | — |
+| Advertising data | No | - | - |
+| Other usage data | No analytics SDK | - | - |
 
 ---
 
@@ -79,10 +79,10 @@ Use these purposes when filling App Store Connect checkboxes:
 | Purpose | Applies to |
 |---------|------------|
 | App Functionality | Account auth, wallet, contacts, cross-border payments, push notifications |
-| Developer's Advertising or Marketing | Notification preference includes `marketing` toggle — only if marketing pushes are sent |
-| Analytics | **No** — not implemented in codebase |
-| Product Personalization | **No** — not implemented in codebase |
-| Other Purposes | Fraud prevention / security (audit logs, session metadata) — confirm with legal |
+| Developer's Advertising or Marketing | Notification preference includes `marketing` toggle, only if marketing pushes are sent |
+| Analytics | **No**, not implemented in codebase |
+| Product Personalization | **No**, not implemented in codebase |
+| Other Purposes | Fraud prevention / security (audit logs, session metadata), confirm with legal |
 
 ---
 
@@ -103,15 +103,15 @@ Use these purposes when filling App Store Connect checkboxes:
 
 ---
 
-## Quick reference — declare in App Store Connect
+## Quick reference: declare in App Store Connect
 
 | Section | Draft declaration |
 |---------|-------------------|
 | Tracking | No |
 | Data Linked to You | Contact Info, Financial Info, Identifiers, User Content (as above) |
 | Data Not Linked to You | None |
-| Privacy policy URL | [TBD — public URL after legal finalizes policy] |
+| Privacy policy URL | [TBD (public URL after legal finalizes policy)] |
 
 ---
 
-> **DRAFT — for legal/product review before App Store Connect submission. Not final copy.**
+> **DRAFT, for legal/product review before App Store Connect submission. Not final copy.**

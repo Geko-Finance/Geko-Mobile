@@ -62,7 +62,7 @@ export async function depositToVault(
 ): Promise<DepositToVaultResult> {
   if (signer.custody === "custodial") {
     // Cavos's WalletSigner only supports signing single native-XLM-payment operations (see
-    // CavosSigner.signTransaction) and submits as a side effect of "signing" — it cannot sign a
+    // CavosSigner.signTransaction) and submits as a side effect of "signing" - it cannot sign a
     // Soroban invokeHostFunction call like a vault deposit, and this flow's own submit step
     // (assembled.signAndSend below) would conflict with Cavos's atomic sign-and-submit anyway.
     throw new Error(
@@ -110,7 +110,7 @@ export async function withdrawFromVault(
 ): Promise<WithdrawFromVaultResult> {
   if (signer.custody === "custodial") {
     // Cavos's WalletSigner only supports signing single native-XLM-payment operations (see
-    // CavosSigner.signTransaction) and submits as a side effect of "signing" — it cannot sign a
+    // CavosSigner.signTransaction) and submits as a side effect of "signing" - it cannot sign a
     // Soroban invokeHostFunction call like a vault withdrawal, and this flow's own submit step
     // (assembled.signAndSend below) would conflict with Cavos's atomic sign-and-submit anyway.
     throw new Error(

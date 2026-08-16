@@ -5,7 +5,7 @@
 ```
 apps/
   mobile/   # Expo / React Native app (see apps/mobile/README.md)
-  server/   # geko-cavos-server — HTTP wrapper for @cavos/kit Stellar support
+  server/   # geko-cavos-server - HTTP wrapper for @cavos/kit Stellar support
 packages/
   defindex-vault/   # Shared TypeScript client for the DeFindex vault
 ```
@@ -14,8 +14,8 @@ packages/
 
 - Node.js (see `packageManager` in the root `package.json` for the pinned npm version)
 - Package manager: **npm** (workspaces)
-- **Docker** — Docker Desktop must be running (used by the local Supabase Postgres stack)
-- **Supabase CLI** — manages the local Postgres stack (`brew install supabase/tap/supabase` or see [Supabase CLI getting started](https://supabase.com/docs/guides/cli/getting-started))
+- **Docker** - Docker Desktop must be running (used by the local Supabase Postgres stack)
+- **Supabase CLI** - manages the local Postgres stack (`brew install supabase/tap/supabase` or see [Supabase CLI getting started](https://supabase.com/docs/guides/cli/getting-started))
 
 ## Getting started
 
@@ -26,7 +26,7 @@ npm install
 # Build shared packages (required before the app can resolve them)
 npm run build
 
-# Start everything in dev — also brings up local Supabase Postgres (port 54432)
+# Start everything in dev, also brings up local Supabase Postgres (port 54432)
 # before Turborepo runs each workspace's `dev` script; no separate step needed
 npm run dev
 ```

@@ -263,7 +263,7 @@ function VaultListSection() {
   if (knownVaults.length === 0 || vaultsQuery.data?.length === 0) {
     return (
       <ScreenPlaceholder
-        description="Vaults for this network aren't available yet — check back soon."
+        description="Vaults for this network aren't available yet, check back soon."
         eyebrow="Invest"
         title="No vaults yet"
       />

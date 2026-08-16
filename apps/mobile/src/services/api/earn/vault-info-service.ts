@@ -104,7 +104,7 @@ export async function fetchVaultPosition(
 /**
  * Converts vault shares to their current underlying value per asset:
  * `assetValue = (shares * totalManagedFunds[asset]) / totalSupply`.
- * Returns zero for every asset when `totalSupply` is zero (empty vault, nothing minted yet) —
+ * Returns zero for every asset when `totalSupply` is zero (empty vault, nothing minted yet) -
  * never divide by zero.
  */
 export function convertSharesToUnderlyingValue(

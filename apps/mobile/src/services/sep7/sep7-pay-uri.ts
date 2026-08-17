@@ -1,5 +1,5 @@
 import type { Asset, AssetType } from "@/src/domain/wallet";
-import { makeAssetId } from "@/src/domain/wallet";
+import { isLikelyStellarPublicKey, makeAssetId } from "@/src/domain/wallet";
 import type { Sep7MemoType, Sep7PaymentRequest } from "@/src/domain/payments";
 
 import { Sep7ParseError, isSep7Uri } from "./sep7-uri";
@@ -118,6 +118,34 @@ export function parseSep7PayUri(uri: string): Sep7PaymentRequest {
     signature: query.get("signature") ?? undefined,
     callback: query.get("callback") ?? undefined,
   };
+}
+
+/**
+ * Rejects a parsed `pay` request that this app must not act on, mirroring the checks
+ * `features/multisig/deep-link/handle-sep7-uri.ts` applies to `tx` requests. A SEP-7 URI is
+ * attacker-supplied by definition - it arrives from a scanned QR or an OS-handed link - so
+ * `parseSep7PayUri` succeeding only means the string was well formed.
+ *
+ * Two things are checked:
+ * - the URI's `network_passphrase`, when present, must match the network the app is on, so a
+ *   link built for another network can't be paid on this one;
+ * - `destination` must look like a Stellar public key. Muxed (`M...`) destinations are
+ *   rejected because the send flow doesn't support them, not because they're hostile.
+ */
+export function assertSep7PayRequestUsable(
+  request: Sep7PaymentRequest,
+  activeNetworkPassphrase: string
+): void {
+  if (
+    request.networkPassphrase !== undefined &&
+    request.networkPassphrase !== activeNetworkPassphrase
+  ) {
+    throw new Sep7ParseError("This payment link is for a different Stellar network.");
+  }
+
+  if (!isLikelyStellarPublicKey(request.destination)) {
+    throw new Sep7ParseError("This payment link has an unsupported destination address.");
+  }
 }
 
 function isSep7MemoType(value: string | null): value is Sep7MemoType {

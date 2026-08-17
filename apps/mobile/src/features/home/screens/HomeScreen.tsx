@@ -179,7 +179,14 @@ export function HomeScreen() {
           >
             <GekoIcon />
           </Pressable>
-          <Bell color="#8E8E92" fill="#8E8E92" size={25} strokeWidth={2.5} />
+          <Pressable
+            accessibilityLabel="Open notifications"
+            accessibilityRole="button"
+            hitSlop={10}
+            onPress={() => router.push("/notifications")}
+          >
+            <Bell color="#8E8E92" fill="#8E8E92" size={25} strokeWidth={2.5} />
+          </Pressable>
         </View>
 
         <FinanceCard balance={formattedBalance} color="blue" owner={ownerName} />

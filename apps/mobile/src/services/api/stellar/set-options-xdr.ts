@@ -1,4 +1,4 @@
-import { Account, BASE_FEE, Operation, TransactionBuilder } from "@stellar/stellar-base";
+import { Account, BASE_FEE, Operation, TransactionBuilder } from "@stellar/stellar-sdk/base";
 
 /**
  * Builds an unsigned `SetOptions` transaction envelope for managing multisig signers and

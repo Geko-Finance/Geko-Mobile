@@ -1,5 +1,5 @@
 import { Client as VaultClient } from "defindex-vault";
-import type { SignTransaction } from "@stellar/stellar-sdk/no-eventsource/contract";
+import type { SignTransaction } from "@stellar/stellar-sdk/contract";
 
 import type { WalletSigner } from "@/src/domain/wallet/signer";
 

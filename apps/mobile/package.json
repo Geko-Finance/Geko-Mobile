@@ -9,6 +9,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "types:routes": "node scripts/generate-router-types.js",
+    "pretypecheck": "npm run types:routes",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "doctor": "npx expo-doctor",

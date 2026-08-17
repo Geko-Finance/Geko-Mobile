@@ -4,7 +4,7 @@ import {
   BASE_FEE,
   Operation,
   TransactionBuilder,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 
 export function buildChangeTrustXdr(params: {
   sourcePublicKey: string;

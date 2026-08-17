@@ -54,7 +54,7 @@ Act as a senior Expo/EAS fintech mobile engineer. Optimize for correctness, main
   - `(app)` for authenticated app routes.
   - `(app)/(tabs)` for primary app tabs.
 - Do not put business logic in route files.
-- Clean `.expo/types/router.d.ts` if typed routes get stale after moving route files.
+- Typed routes are regenerated automatically: `npm run typecheck` runs `pretypecheck`, which rewrites `.expo/types/router.d.ts`. Run `npm run types:routes` on its own if an editor is holding stale route types.
 
 ## Validation
 

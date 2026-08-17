@@ -52,6 +52,22 @@ All tasks run through Turborepo from the repo root:
 > this ordering for `build`/`typecheck`/`test`; run `npm run build` after a fresh
 > clone before `npm run dev`.
 
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and
+on pushes to `main`:
+
+| Job                    | What it does                                                     |
+| ---------------------- | ---------------------------------------------------------------- |
+| `checks`               | `npm ci` → typecheck → lint → test, with npm and `.turbo` caching |
+| `expo-doctor`          | `npx expo-doctor` for `apps/mobile` (not required for merge)      |
+| `migrations`           | Applies `apps/backend` migrations to a fresh Postgres 16          |
+
+`checks` regenerates the Expo typed routes (`npm run types:routes -w geko-mobile`)
+before typechecking, so a missing or stale `.expo/types/router.d.ts` can neither fail
+the build nor hide a real route error. Lint fails on errors only; the known warnings
+from generated Gluestack UI files are tolerated.
+
 ## EAS builds
 
 Run from the mobile app directory; EAS auto-detects the workspace root:

@@ -77,6 +77,15 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   ABROAD_STELLAR_DEPOSIT_ADDRESS?: string;
+
+  /** Server-side Soroswap API credential. Swap endpoints return 503 when absent. */
+  @IsOptional()
+  @IsString()
+  SOROSWAP_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  SOROSWAP_API_URL?: string;
 }
 
 function isNonBlankString(value: unknown): value is string {

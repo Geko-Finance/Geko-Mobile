@@ -41,6 +41,37 @@ NestJS API for the Geko wallet. This workspace is scaffold-only; auth, wallets, 
 
 The server listens on `PORT` (default `4000`).
 
+## Production configuration
+
+The API validates security-critical configuration before NestJS starts. Production boot
+fails when database or mobile-origin configuration is missing, when JWT secrets are
+placeholders or shorter than 32 characters, or when the wallet encryption key is not a
+base64-encoded 32-byte value. Validation errors name the affected variable but never
+include its value.
+
+Generate independent secrets for each deployment instead of copying the development
+placeholders from `.env.example`:
+
+```bash
+# JWT access secret
+openssl rand -base64 48
+
+# JWT refresh secret (generate separately)
+openssl rand -base64 48
+
+# AES-256-GCM wallet-secrets key (exactly 32 bytes)
+openssl rand -base64 32
+```
+
+Store these values in the deployment platform's secret manager. Do not commit them to
+the repository or reuse them across environments. When `CAVOS_NETWORK=mainnet`, URL,
+origin, endpoint, host, and network settings must not point to testnet.
+
+The Abroad Finance integration is optional. It is enabled only when `ABROAD_API_KEY`,
+`ABROAD_WEBHOOK_SECRET`, and `ABROAD_STELLAR_DEPOSIT_ADDRESS` are all non-empty; a
+partial group is cleared during validation so cross-border endpoints remain safely
+disabled and the webhook continues to fail closed.
+
 ## Database (Drizzle)
 
 Schema files live under `src/db/schema` (added in the next phase). Migrations are written to `src/db/migrations`.

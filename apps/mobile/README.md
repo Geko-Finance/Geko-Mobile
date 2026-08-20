@@ -56,6 +56,18 @@ Zustand owns local client state, TanStack Query owns server state, and `SecureSt
 secrets and session tokens. `AsyncStorage` is for non-secret metadata only. The full
 conventions are in [CLAUDE.md](CLAUDE.md); deeper notes are in [docs/](docs).
 
+## Swaps
+
+The swap screen compares exact-input quotes from Soroswap and Stellar native strict-send
+path payments, then ranks them by destination amount after destination-denominated fees.
+All amount and slippage math uses integer stroops. The transaction is built by the chosen
+adapter, signed through the active wallet signer, and monitored through Horizon with
+TanStack Query.
+
+Soroswap requires `SOROSWAP_API_KEY` on the backend; the mobile bundle never receives the
+credential. Without it, the native Stellar route remains available. An issued destination
+asset must already have a trustline before the app enables quoting.
+
 ## Typed routes
 
 `.expo/types/router.d.ts` is generated and gitignored. It is missing on a fresh clone and

@@ -3,10 +3,10 @@
  * invocation with no generated bindings - the same shape defindex-vault-service.ts
  * gets for free from the generated `defindex-vault` Client, hand-rolled for contracts
  * this repo has no codegen for (CCTP's TokenMessengerMinter / MessageTransmitter).
- * Building blocks (`Contract`, `Address`, XDR helpers) come from `@stellar/stellar-base`,
- * which is safe to import at runtime; the RPC server comes from the `no-eventsource`
- * submodule of `@stellar/stellar-sdk`, exactly as defindex-vault's own index.ts does -
- * see stellar-client.ts's doc comment for why the plain `@stellar/stellar-sdk` import is
+ * Building blocks (`Contract`, `Address`, XDR helpers) come from
+ * `@stellar/stellar-sdk/base`, which is safe to import at runtime; the RPC server comes
+ * from the `rpc` submodule, exactly as defindex-vault's own index.ts does - see
+ * stellar-client.ts's doc comment for why the plain `@stellar/stellar-sdk` import is
  * forbidden (its Horizon module drags in Node-only `eventsource`).
  */
 import {
@@ -17,8 +17,8 @@ import {
   TransactionBuilder,
   scValToNative,
   xdr,
-} from "@stellar/stellar-base";
-import { Api as SorobanRpcApi, Server as SorobanRpcServer } from "@stellar/stellar-sdk/no-eventsource/rpc";
+} from "@stellar/stellar-sdk/base";
+import { Api as SorobanRpcApi, Server as SorobanRpcServer } from "@stellar/stellar-sdk/rpc";
 
 import type { WalletSigner } from "@/src/domain/wallet";
 

@@ -5,7 +5,7 @@
  * transfer. See domain/cctp/transfer.ts's CctpTransferDirection doc for why only
  * these two Stellar-side steps are automated end-to-end by this app.
  */
-import { Address, Asset, StrKey, nativeToScVal } from "@stellar/stellar-base";
+import { Address, Asset, StrKey, nativeToScVal } from "@stellar/stellar-sdk/base";
 import { Buffer } from "buffer";
 
 import type { WalletSigner } from "@/src/domain/wallet";

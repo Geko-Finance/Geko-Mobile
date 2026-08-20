@@ -42,7 +42,6 @@ export function HomeScreen() {
   const transactions = useAccountTransactions(activeAccount?.publicKey);
   const [selectedPeriod, setSelectedPeriod] =
     useState<TransactionPeriod>("month");
-  const [showComingSoon, setShowComingSoon] = useState(false);
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const stickyOpacity = useMemo(
     () =>
@@ -198,20 +197,10 @@ export function HomeScreen() {
             />
             <QuickAction
               icon={CircleDollarSign}
-              label="Buy & Sell"
-              onPress={() => setShowComingSoon(true)}
+              label="Swap"
+              onPress={() => router.push("/swap")}
             />
           </View>
-          {showComingSoon ? (
-            <Pressable
-              className="mt-2 rounded-xl bg-[#1E1E20] px-4 py-3"
-              onPress={() => setShowComingSoon(false)}
-            >
-              <Text className="text-[13px] font-semibold text-[#8E8E92]">
-                Buy & Sell is coming soon.
-              </Text>
-            </Pressable>
-          ) : null}
         </View>
 
         {otherBalances.length > 0 ? (

@@ -1,4 +1,4 @@
-import { Transaction, TransactionBuilder } from "@stellar/stellar-base";
+import { Transaction, TransactionBuilder } from "@stellar/stellar-sdk/base";
 
 import type { WalletAccount } from "@/src/domain/wallet";
 import { getStellarClient } from "@/src/services/api/stellar/stellar-client";

@@ -8,7 +8,7 @@ import {
   Operation,
   Transaction,
   TransactionBuilder,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 
 import type { MultisigAccount } from "@/src/domain/multisig";
 import {

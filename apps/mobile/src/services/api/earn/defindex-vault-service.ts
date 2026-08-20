@@ -37,6 +37,20 @@ export interface DepositToVaultResult {
   dfTokensMinted: bigint;
 }
 
+export interface WithdrawFromVaultInput {
+  /** Soroban contract address (`C...`) of the vault, e.g. one of `KNOWN_VAULTS`. */
+  vaultAddress: string;
+  /** Vault shares (df-tokens) to burn/withdraw. */
+  withdrawShares: bigint;
+  /** Minimum accepted amount per vault asset (slippage floor), matching the vault's asset order. */
+  minAmountsOut: bigint[];
+}
+
+export interface WithdrawFromVaultResult {
+  /** Actual amounts returned per vault asset. */
+  amountsWithdrawn: bigint[];
+}
+
 /**
  * Builds, simulates, signs (via the provided `WalletSigner`), and submits a deposit into a
  * DeFindex-standard vault. Throws if the vault rejects the deposit (`ContractError`) or the
@@ -48,7 +62,7 @@ export async function depositToVault(
 ): Promise<DepositToVaultResult> {
   if (signer.custody === "custodial") {
     // Cavos's WalletSigner only supports signing single native-XLM-payment operations (see
-    // CavosSigner.signTransaction) and submits as a side effect of "signing" — it cannot sign a
+    // CavosSigner.signTransaction) and submits as a side effect of "signing" - it cannot sign a
     // Soroban invokeHostFunction call like a vault deposit, and this flow's own submit step
     // (assembled.signAndSend below) would conflict with Cavos's atomic sign-and-submit anyway.
     throw new Error(
@@ -83,4 +97,51 @@ export async function depositToVault(
   const [amounts, dfTokensMinted] = sent.result.unwrap();
 
   return { amounts, dfTokensMinted };
+}
+
+/**
+ * Builds, simulates, signs (via the provided `WalletSigner`), and submits a withdrawal from a
+ * DeFindex-standard vault, burning the given vault shares. Throws if the vault rejects the
+ * withdrawal (`ContractError`) or the transaction fails on the network.
+ */
+export async function withdrawFromVault(
+  input: WithdrawFromVaultInput,
+  signer: WalletSigner
+): Promise<WithdrawFromVaultResult> {
+  if (signer.custody === "custodial") {
+    // Cavos's WalletSigner only supports signing single native-XLM-payment operations (see
+    // CavosSigner.signTransaction) and submits as a side effect of "signing" - it cannot sign a
+    // Soroban invokeHostFunction call like a vault withdrawal, and this flow's own submit step
+    // (assembled.signAndSend below) would conflict with Cavos's atomic sign-and-submit anyway.
+    throw new Error(
+      "Vault withdrawals need a non-custodial signer; Cavos only supports native XLM payments."
+    );
+  }
+
+  const network = getActiveStellarNetwork();
+
+  if (network.rpcUrl === undefined) {
+    throw new Error(`No Soroban RPC configured for network "${network.id}"`);
+  }
+
+  const depositorAddress = await signer.getAddress();
+
+  const client = new VaultClient({
+    contractId: input.vaultAddress,
+    networkPassphrase: network.networkPassphrase,
+    publicKey: depositorAddress,
+    rpcUrl: network.rpcUrl,
+    signTransaction: toContractSignTransaction(signer, network.networkPassphrase),
+  });
+
+  const assembled = await client.withdraw({
+    withdraw_shares: input.withdrawShares,
+    min_amounts_out: input.minAmountsOut,
+    from: depositorAddress,
+  });
+
+  const sent = await assembled.signAndSend();
+  const result = sent.result.unwrap();
+
+  return { amountsWithdrawn: result };
 }

@@ -8,13 +8,22 @@
   ],
   "packageManager": "npm@11.14.1",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "npm run supabase:start && turbo run dev",
+    "supabase:start": "supabase start --workdir apps/backend --exclude edge-runtime,gotrue,imgproxy,kong,logflare,mailpit,postgres-meta,postgrest,realtime,storage-api,studio,supavisor,vector --yes",
+    "supabase:stop": "supabase stop --workdir apps/backend",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "devDependencies": {
-    "turbo": "2.10.6"
+    "turbo": "^2.10.6"
+  },
+  "dependencies": {
+    "expo": "~54.0.36",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   }
 }

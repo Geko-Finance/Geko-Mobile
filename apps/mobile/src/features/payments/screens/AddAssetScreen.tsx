@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,15 +22,19 @@ import { getLocalWalletErrorMessage } from "@/src/services/wallet/local-wallet-e
 
 export function AddAssetScreen() {
   const router = useRouter();
+  // Optional prefill, e.g. the CCTP receive screen sending the user here to add Circle's USDC.
+  const prefill = useLocalSearchParams<{ code?: string; issuer?: string }>();
   const activeAccount = useActiveAccount();
   const addTrustline = useAddTrustline();
-  const [mode, setMode] = useState<"search" | "manual">("search");
+  const [mode, setMode] = useState<"search" | "manual">(
+    prefill.code !== undefined && prefill.issuer !== undefined ? "manual" : "search"
+  );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AssetSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selected, setSelected] = useState<AssetSearchResult | null>(null);
-  const [code, setCode] = useState("");
-  const [issuer, setIssuer] = useState("");
+  const [code, setCode] = useState(prefill.code ?? "");
+  const [issuer, setIssuer] = useState(prefill.issuer ?? "");
   const [walletPin, setWalletPin] = useState("");
 
   const needsPin = activeAccount?.custody === "non_custodial";

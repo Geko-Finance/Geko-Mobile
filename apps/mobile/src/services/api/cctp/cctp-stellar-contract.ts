@@ -72,7 +72,7 @@ export async function depositForBurn(input: DepositForBurnInput): Promise<{ burn
   return { burnTxHash: hash };
 }
 
-export interface ReceiveMessageInput {
+export interface MintAndForwardInput {
   readonly messageBytesHex: string;
   readonly attestationHex: string;
   readonly sourcePublicKey: string;
@@ -80,20 +80,22 @@ export interface ReceiveMessageInput {
 }
 
 /**
- * Calls MessageTransmitter.`receive_message` to validate an attestation and deliver
- * the CCTP message body, minting USDC to the recipient encoded in the message. This
- * call is permissionless on every CCTP chain (any account can submit it - the
- * recipient is fixed by the message, not by who signs); `sourcePublicKey`/`signer`
- * here is simply the Stellar account paying this transaction's fee.
+ * Calls CctpForwarder.`mint_and_forward(message, attestation)` to finish a
+ * `remote_to_stellar` transfer. Inbound burns name the forwarder as both
+ * `mintRecipient` and `destinationCaller` (see `stellarForwarderMintRecipientHex`), so
+ * the forwarder is the only account MessageTransmitter.`receive_message` will accept
+ * the message from: it mints to itself and forwards the USDC to the Stellar address
+ * carried in the hook data, in the same transaction. Calling MessageTransmitter
+ * directly can never deliver an inbound transfer to the user. Verified against the
+ * deployed testnet contract with `stellar contract info interface`.
  *
- * Unlike burning, re-submitting this call is protocol-safe: CCTP's MessageTransmitter
- * tracks each message's nonce and rejects a message it has already delivered, on
- * every chain, by design - so if a resumed transfer calls this again after an earlier
- * attempt actually succeeded, the retry fails harmlessly on-chain instead of
- * double-minting (contrast with domain/cctp/transfer.ts#nextStep's `"verify_burn"`
- * guard, which exists precisely because burning has no equivalent protection).
+ * Anyone can submit this call - the recipient is fixed by the message, not by who
+ * signs; `sourcePublicKey`/`signer` is only the account paying the fee. Re-submitting
+ * is protocol-safe: MessageTransmitter rejects a nonce it has already delivered, so a
+ * retry after an earlier success fails on-chain instead of double-minting (contrast
+ * with domain/cctp/transfer.ts#nextStep's `"verify_burn"` guard).
  */
-export async function receiveMessage(input: ReceiveMessageInput): Promise<{ mintTxHash: string }> {
+export async function mintAndForward(input: MintAndForwardInput): Promise<{ mintTxHash: string }> {
   const { rpcUrl, networkPassphrase, networkId } = requireRpcUrl();
   const contracts = getCctpStellarContracts(networkId);
 
@@ -103,8 +105,8 @@ export async function receiveMessage(input: ReceiveMessageInput): Promise<{ mint
   ];
 
   const { hash } = await invokeSorobanContract({
-    contractId: contracts.messageTransmitter,
-    method: "receive_message",
+    contractId: contracts.cctpForwarder,
+    method: "mint_and_forward",
     args,
     sourcePublicKey: input.sourcePublicKey,
     rpcUrl,

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import { unitsToRemoteAmount } from "@/src/domain/cctp";
+import { buildBurnMessage, forwarderHookDataHex } from "@/src/domain/cctp/__fixtures__/burn-message";
 import type { WalletSigner } from "@/src/domain/wallet";
 import {
   CctpAttestationFailedError,
   CctpAttestationPendingError,
   depositForBurn,
   fetchCctpAttestation,
-  receiveMessage,
+  mintAndForward,
 } from "@/src/services/api/cctp";
 
 import { useCctpTransferStore } from "../../state/transfer-store";
@@ -28,7 +30,10 @@ jest.mock("@/src/services/api/cctp", () => {
   return {
     depositForBurn: jest.fn(),
     fetchCctpAttestation: jest.fn(),
-    receiveMessage: jest.fn(),
+    mintAndForward: jest.fn(),
+    // Testnet CctpForwarder as bytes32 (see domain/cctp/__fixtures__/burn-message.ts).
+    stellarForwarderMintRecipientHex: () =>
+      "0x3de86ac50b47eaf2840fe23e48179551660fd1072fba6f445d4a6bd7af4ab93e",
     CctpAttestationPendingError: actualErrors.CctpAttestationPendingError,
     CctpAttestationFailedError: actualErrors.CctpAttestationFailedError,
   };
@@ -36,7 +41,7 @@ jest.mock("@/src/services/api/cctp", () => {
 
 const mockDepositForBurn = depositForBurn as jest.MockedFunction<typeof depositForBurn>;
 const mockFetchAttestation = fetchCctpAttestation as jest.MockedFunction<typeof fetchCctpAttestation>;
-const mockReceiveMessage = receiveMessage as jest.MockedFunction<typeof receiveMessage>;
+const mockMintAndForward = mintAndForward as jest.MockedFunction<typeof mintAndForward>;
 
 const OWNER_USER_ID = "user-1";
 const STELLAR_PUBLIC_KEY = "GABCDEXAMPLE";
@@ -220,6 +225,82 @@ describe("pollAttestationStep", () => {
     expect(stored?.status).toBe("failed");
     expect(stored?.failedStep).toBe("attestation");
   });
+
+  it("recovers a transfer whose attestation step failed once Circle completes on retry", async () => {
+    recordExternalBurn({
+      id: "t10",
+      ownerUserId: OWNER_USER_ID,
+      direction: "remote_to_stellar",
+      sourceChainId: "ethereum",
+      destinationChainId: "stellar",
+      stellarPublicKey: STELLAR_PUBLIC_KEY,
+      recipientAddress: STELLAR_PUBLIC_KEY,
+      amount: "1",
+      burnTxHash: "external-burn-hash",
+    });
+    useCctpTransferStore.getState().markFailed("t10", "attestation", "Circle unreachable");
+    mockFetchAttestation.mockResolvedValue({
+      messageBytes: buildBurnMessage({ amount: 1000000n, hookData: forwarderHookDataHex(STELLAR_PUBLIC_KEY) }),
+      attestation: "0xattn",
+    });
+
+    const result = await pollAttestationStep("t10");
+
+    expect(result.status).toBe("attested");
+    expect(result.attestation).toBe("0xattn");
+  });
+
+  it("takes an inbound transfer's amount from Circle's message, net of any fee", async () => {
+    recordExternalBurn({
+      id: "t11",
+      ownerUserId: OWNER_USER_ID,
+      direction: "remote_to_stellar",
+      sourceChainId: "ethereum",
+      destinationChainId: "stellar",
+      stellarPublicKey: STELLAR_PUBLIC_KEY,
+      recipientAddress: STELLAR_PUBLIC_KEY,
+      amount: "",
+      burnTxHash: "external-burn-hash",
+    });
+    mockFetchAttestation.mockResolvedValue({
+      messageBytes: buildBurnMessage({
+        amount: 2500000n,
+        feeExecuted: 500000n,
+        hookData: forwarderHookDataHex(STELLAR_PUBLIC_KEY),
+      }),
+      attestation: "0xattn",
+    });
+
+    const result = await pollAttestationStep("t11");
+
+    expect(result.status).toBe("attested");
+    expect(result.amount).toBe(unitsToRemoteAmount(2000000n));
+  });
+
+  it("refuses an inbound transfer whose USDC is headed to a different Stellar wallet", async () => {
+    recordExternalBurn({
+      id: "t12",
+      ownerUserId: OWNER_USER_ID,
+      direction: "remote_to_stellar",
+      sourceChainId: "ethereum",
+      destinationChainId: "stellar",
+      stellarPublicKey: STELLAR_PUBLIC_KEY,
+      recipientAddress: STELLAR_PUBLIC_KEY,
+      amount: "",
+      burnTxHash: "external-burn-hash",
+    });
+    mockFetchAttestation.mockResolvedValue({
+      messageBytes: buildBurnMessage({ amount: 1000000n, hookData: forwarderHookDataHex("GSOMEONEELSE") }),
+      attestation: "0xattn",
+    });
+
+    await expect(pollAttestationStep("t12")).rejects.toThrow();
+
+    const stored = useCctpTransferStore.getState().transfers.find((t) => t.id === "t12");
+    expect(stored?.status).toBe("failed");
+    expect(stored?.failedStep).toBe("attestation");
+    expect(stored?.attestation).toBeUndefined();
+  });
 });
 
 describe("completeMintStep", () => {
@@ -238,7 +319,7 @@ describe("completeMintStep", () => {
     await expect(completeMintStep({ transferId: "t8", signer: fakeSigner })).rejects.toMatchObject({
       code: "CANNOT_AUTO_MINT",
     } satisfies Partial<CctpFlowError>);
-    expect(mockReceiveMessage).not.toHaveBeenCalled();
+    expect(mockMintAndForward).not.toHaveBeenCalled();
   });
 
   it("mints and advances a remote_to_stellar transfer to minted", async () => {
@@ -259,7 +340,7 @@ describe("completeMintStep", () => {
     useCctpTransferStore
       .getState()
       .advance("t9", "attested", { messageBytes: "0xmsg", attestation: "0xattn" });
-    mockReceiveMessage.mockResolvedValue({ mintTxHash: "mint-hash" });
+    mockMintAndForward.mockResolvedValue({ mintTxHash: "mint-hash" });
 
     const result = await completeMintStep({ transferId: "t9", signer: fakeSigner });
 

@@ -1,7 +1,11 @@
+import { scValToNative, xdr } from "@stellar/stellar-sdk/base";
+
 import { appConfig } from "@/src/config/env";
+import { cctpChainByDomainId, decodeCctpV2BurnMessage, type CctpChainId } from "@/src/domain/cctp";
 import type { StellarNetworkId } from "@/src/domain/wallet";
 
 import { ApiError } from "../api-errors";
+import { getCctpStellarContracts } from "../cctp/cctp-config";
 import {
   STELLAR_NETWORKS,
   getActiveStellarNetwork,
@@ -11,24 +15,41 @@ export interface StellarTransactionEntry {
   readonly id: string;
   readonly type: "sent" | "received";
   readonly counterparty: string;
-  readonly amountXlm: string;
+  /** Decimal amount in `assetCode` units. */
+  readonly amount: string;
+  /** "XLM" for native lumens, otherwise the issued asset's code (e.g. "USDC"). */
+  readonly assetCode: string;
   readonly createdAt: string;
   readonly hash: string;
+  /** Set when the funds arrived through CCTP: the network the sender burned on. */
+  readonly originChainId?: CctpChainId;
 }
 
-interface HorizonPaymentRecord {
+interface HorizonAssetBalanceChange {
+  asset_type: string;
+  asset_code?: string;
+  type: string;
+  from?: string;
+  to?: string;
+  amount: string;
+}
+
+export interface HorizonPaymentRecord {
   id: string;
   type: string;
   type_i: number;
   created_at: string;
   transaction_hash: string;
   asset_type?: string;
+  asset_code?: string;
   from?: string;
   to?: string;
   amount?: string;
   funder?: string;
   account?: string;
   starting_balance?: string;
+  asset_balance_changes?: HorizonAssetBalanceChange[];
+  parameters?: { type: string; value: string }[];
 }
 
 interface HorizonPaymentsResponse {
@@ -37,43 +58,106 @@ interface HorizonPaymentsResponse {
   };
 }
 
-function mapPaymentRecord(
+const CCTP_FORWARDERS = new Set([
+  getCctpStellarContracts("testnet").cctpForwarder,
+  getCctpStellarContracts("mainnet").cctpForwarder,
+]);
+
+/**
+ * For a CctpForwarder `mint_and_forward` call, the real sender is the wallet that
+ * burned on the other network - carried in the CCTP message passed as the call's
+ * first argument. Returns undefined for any other contract call or unreadable data.
+ */
+function cctpSenderOf(
+  record: HorizonPaymentRecord
+): { counterparty: string; originChainId?: CctpChainId } | undefined {
+  const [contract, method, message] = record.parameters ?? [];
+
+  try {
+    if (
+      contract === undefined ||
+      message === undefined ||
+      !CCTP_FORWARDERS.has(scValToNative(xdr.ScVal.fromXDR(contract.value, "base64")) as string) ||
+      scValToNative(xdr.ScVal.fromXDR(method.value, "base64")) !== "mint_and_forward"
+    ) {
+      return undefined;
+    }
+
+    const bytes = scValToNative(xdr.ScVal.fromXDR(message.value, "base64")) as Uint8Array;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const decoded = decodeCctpV2BurnMessage(hex);
+
+    return {
+      counterparty: decoded.messageSender,
+      originChainId: cctpChainByDomainId(decoded.sourceDomain)?.id,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function assetCodeOf(assetType: string | undefined, assetCode: string | undefined): string {
+  return assetType === "native" || assetCode === undefined ? "XLM" : assetCode;
+}
+
+export function mapPaymentRecord(
   record: HorizonPaymentRecord,
   publicKey: string
 ): StellarTransactionEntry | null {
-  if (record.type === "payment" && record.asset_type === "native") {
+  const base = { id: record.id, createdAt: record.created_at, hash: record.transaction_hash };
+
+  if (record.type === "payment") {
     const received = record.to === publicKey;
-    const counterparty = received ? record.from! : record.to!;
+
     return {
-      id: record.id,
+      ...base,
       type: received ? "received" : "sent",
-      counterparty,
-      amountXlm: record.amount!,
-      createdAt: record.created_at,
-      hash: record.transaction_hash,
+      counterparty: received ? record.from! : record.to!,
+      amount: record.amount!,
+      assetCode: assetCodeOf(record.asset_type, record.asset_code),
     };
   }
 
   if (record.type === "create_account") {
     if (record.account === publicKey) {
       return {
-        id: record.id,
+        ...base,
         type: "received",
         counterparty: record.funder!,
-        amountXlm: record.starting_balance!,
-        createdAt: record.created_at,
-        hash: record.transaction_hash,
+        amount: record.starting_balance!,
+        assetCode: "XLM",
       };
     }
 
     if (record.funder === publicKey) {
       return {
-        id: record.id,
+        ...base,
         type: "sent",
         counterparty: record.account!,
-        amountXlm: record.starting_balance!,
-        createdAt: record.created_at,
-        hash: record.transaction_hash,
+        amount: record.starting_balance!,
+        assetCode: "XLM",
+      };
+    }
+  }
+
+  // Contract calls (CCTP mints, vault withdrawals, swaps, ...) only show this
+  // account's funds moving inside asset_balance_changes.
+  if (record.type === "invoke_host_function") {
+    const change = record.asset_balance_changes?.find(
+      (entry) => entry.to === publicKey || entry.from === publicKey
+    );
+
+    if (change !== undefined) {
+      const received = change.to === publicKey;
+      const cctpSender = received ? cctpSenderOf(record) : undefined;
+
+      return {
+        ...base,
+        type: received ? "received" : "sent",
+        counterparty: cctpSender?.counterparty ?? (received ? change.from : change.to) ?? "",
+        amount: change.amount,
+        assetCode: assetCodeOf(change.asset_type, change.asset_code),
+        ...(cctpSender?.originChainId !== undefined ? { originChainId: cctpSender.originChainId } : {}),
       };
     }
   }
@@ -82,7 +166,7 @@ function mapPaymentRecord(
 }
 
 /**
- * Fetches recent native XLM payment history for an account from Horizon.
+ * Fetches recent payment history (any asset, including contract-call transfers) for an account from Horizon.
  */
 export async function fetchAccountPayments(
   publicKey: string,

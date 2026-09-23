@@ -50,10 +50,10 @@ export function SendOptionsScreen() {
               <Globe color="#8E8E92" size={18} strokeWidth={2.5} />
             </View>
             <Text className="mt-4 text-[15px] font-extrabold text-white">
-              Other{"\n"}chains
+              Other{"\n"}networks
             </Text>
             <Text className="mt-1 text-[13px] font-semibold text-[#8E8E92]">
-              USDC via CCTP
+              Bring in USDC
             </Text>
           </Pressable>
         </View>

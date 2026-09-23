@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 interface TransactionRowProps {
   amount: string;
@@ -7,6 +7,8 @@ interface TransactionRowProps {
   icon: LucideIcon;
   meta: string;
   title: string;
+  /** Opens the transaction elsewhere (e.g. a block explorer); the row is static without it. */
+  onPress?: () => void;
 }
 
 const amountToneClassName: Record<TransactionRowProps["amountTone"], string> = {
@@ -21,9 +23,15 @@ export function TransactionRow({
   icon: Icon,
   meta,
   title,
+  onPress,
 }: TransactionRowProps) {
   return (
-    <View className="flex-row items-center border-b border-white/10 px-5 py-5">
+    <Pressable
+      accessibilityRole={onPress !== undefined ? "link" : undefined}
+      className="flex-row items-center border-b border-white/10 px-5 py-5"
+      disabled={onPress === undefined}
+      onPress={onPress}
+    >
       <View className="mr-4 h-[48px] w-[48px] items-center justify-center rounded-full bg-[#087BFF]">
         <Icon color="#FFFFFF" size={24} strokeWidth={3} />
       </View>
@@ -40,6 +48,6 @@ export function TransactionRow({
           {amount}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }

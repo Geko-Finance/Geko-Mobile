@@ -24,6 +24,12 @@ async function requestIris<T>(path: string): Promise<T> {
       signal: controller.signal,
     });
 
+    // Circle answers 404 "Message not found" until it has indexed the burn - the
+    // normal state right after a user pastes a fresh tx hash, not an outage.
+    if (response.status === 404) {
+      throw new CctpAttestationPendingError();
+    }
+
     if (!response.ok) {
       throw new CctpProviderUnavailableError(
         `Circle attestation API request failed (${response.status})`
@@ -32,7 +38,7 @@ async function requestIris<T>(path: string): Promise<T> {
 
     return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof CctpProviderUnavailableError) {
+    if (error instanceof CctpProviderUnavailableError || error instanceof CctpAttestationPendingError) {
       throw error;
     }
 

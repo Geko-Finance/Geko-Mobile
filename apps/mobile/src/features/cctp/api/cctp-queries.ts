@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  isTerminalStatus,
+  isAwaitingAttestation,
   nextStep,
   stellarAmountToUnits,
   type CctpChainId,
@@ -20,7 +20,7 @@ import {
   runBurnStep,
   startOutboundTransfer,
 } from "./cctp-flow";
-import { useResumableCctpTransfers } from "../state/transfer-store";
+import { useCctpTransferStore, useResumableCctpTransfers } from "../state/transfer-store";
 
 export const cctpKeys = {
   all: ["cctp"] as const,
@@ -30,25 +30,26 @@ export const cctpKeys = {
 const ATTESTATION_POLL_INTERVAL_MS = 5000;
 
 /**
- * Polls Circle's attestation API for a burned/attesting transfer until it reaches a
- * terminal state (`attested`/`minted`) or `failed`; `refetchInterval` stops itself
- * once terminal, matching wallet-queries.ts's read-hook shape. Safe to mount on a
- * screen that was just opened for a transfer resumed mid-flight - it reads the
- * transfer's already-persisted status from the store (via `queryFn`) rather than
- * assuming it starts at `burned`.
+ * Polls Circle's attestation API while a transfer is `burned`/`attesting`. Whether to
+ * keep polling is read from the transfer's persisted status in the store, not from the
+ * last fetch result: a network error or Circle's early 404 leaves `data` undefined or
+ * the query in an error state, and must not stop polling for good. Stops on its own
+ * once the transfer leaves those statuses (`attested`, `failed`, ...). Safe to mount
+ * on a screen opened for a transfer resumed mid-flight.
  */
 export function useCctpAttestationPolling(transfer: CctpTransfer | undefined) {
+  const transferId = transfer?.id;
+
   return useQuery<CctpTransfer, Error>({
-    enabled:
-      transfer !== undefined &&
-      (transfer.status === "burned" || transfer.status === "attesting"),
-    queryFn: () => pollAttestationStep(transfer!.id),
-    queryKey: cctpKeys.attestation(transfer?.id ?? "none"),
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      return data === undefined || isTerminalStatus(data.status) || data.status === "attested"
-        ? false
-        : ATTESTATION_POLL_INTERVAL_MS;
+    enabled: isAwaitingAttestation(transfer),
+    queryFn: () => pollAttestationStep(transferId!),
+    queryKey: cctpKeys.attestation(transferId ?? "none"),
+    refetchInterval: () => {
+      const current = useCctpTransferStore
+        .getState()
+        .transfers.find((entry) => entry.id === transferId);
+
+      return isAwaitingAttestation(current) ? ATTESTATION_POLL_INTERVAL_MS : false;
     },
   });
 }

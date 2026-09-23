@@ -6,7 +6,14 @@ export type {
   CctpTransferStatus,
   CctpTransferStep,
 } from "./transfer";
-export { canAutoCompleteMint, canTransition, isResumable, isTerminalStatus, nextStep } from "./transfer";
+export {
+  canAutoCompleteMint,
+  canTransition,
+  isAwaitingAttestation,
+  isResumable,
+  isTerminalStatus,
+  nextStep,
+} from "./transfer";
 export {
   remoteAmountToStellarAmount,
   remoteAmountToUnits,
@@ -15,3 +22,5 @@ export {
   unitsToRemoteAmount,
   unitsToStellarAmount,
 } from "./amount";
+export type { CctpV2BurnMessage } from "./message";
+export { decodeCctpV2BurnMessage, parseForwarderHookData } from "./message";

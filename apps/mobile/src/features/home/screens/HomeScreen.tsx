@@ -11,7 +11,6 @@ import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { canSend } from "@/src/domain/wallet";
-import { ComingSoonModal } from "@/src/features/home/components/ComingSoonModal";
 import { GekoIcon } from "@/src/features/home/components/GekoIcon";
 import {
   CARD_ASSETS,
@@ -210,13 +209,6 @@ export function HomeScreen() {
             />
           </View>
         </View>
-
-        <ComingSoonModal
-          description="Buying and selling crypto directly in Geko is on the way. We'll let you know the moment it's ready."
-          title="Buy & Sell is coming soon"
-          visible={showComingSoon}
-          onDismiss={() => setShowComingSoon(false)}
-        />
 
         {otherBalances.length > 0 ? (
           <View className="mt-4 overflow-hidden rounded-[20px] bg-[#121214]">

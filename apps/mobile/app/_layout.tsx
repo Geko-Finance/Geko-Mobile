@@ -1,4 +1,5 @@
 import "@/src/services/crypto/crypto-polyfill";
+import "@/src/services/crypto/buffer-polyfill";
 import {
   DarkTheme,
   DefaultTheme,

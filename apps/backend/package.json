@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
+    "start:prod": "node dist/main.js",
+    "migrate:prod": "node dist/db/migrate.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint",
     "test": "jest"

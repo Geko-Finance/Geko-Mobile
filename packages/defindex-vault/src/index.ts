@@ -1,14 +1,16 @@
 import { Buffer } from "buffer";
-// Patched from the CLI-generated defaults (`@stellar/stellar-sdk`, `@stellar/stellar-sdk/contract`,
-// `@stellar/stellar-sdk/rpc`) for Metro/React Native bundling — see
+// Patched from the CLI-generated defaults for Metro/React Native bundling - see
 // src/services/api/stellar/stellar-client.ts in the app for the same constraint:
-// - `contract`/`rpc` now come from the `no-eventsource` submodules: the plain exports pull in
-//   Horizon's Node-only `eventsource` dependency, which Metro cannot resolve.
+// - `contract` and `rpc` are imported as submodules, never through the root
+//   `@stellar/stellar-sdk` entry point, whose Horizon module pulls in the Node-only
+//   `eventsource` dependency that Metro cannot resolve. Under SDK 15 these were the
+//   `no-eventsource/*` variants; SDK 16 dropped that build matrix, and the plain
+//   `contract`/`rpc` submodules are the replacement.
 // - The CLI template's unused `import { Address } from "@stellar/stellar-sdk"` and blanket
 //   `export * from "@stellar/stellar-sdk"` were dropped rather than patched: this contract's
 //   generated methods pass addresses as plain `string`, so `Address` was never actually used, and
-//   even the `no-eventsource` counterpart of the wildcard export still bundles the CLI/codegen
-//   `bindings` submodule, which does a `require("../../package.json")` that Metro can't resolve.
+//   the wildcard export still bundles the CLI/codegen `bindings` submodule, which does a
+//   `require("../../package.json")` that Metro can't resolve.
 // Re-apply this patch if bindings are regenerated.
 import {
   AssembledTransaction,
@@ -17,7 +19,7 @@ import {
   MethodOptions,
   Result,
   Spec as ContractSpec,
-} from "@stellar/stellar-sdk/no-eventsource/contract";
+} from "@stellar/stellar-sdk/contract";
 import type {
   u32,
   i32,
@@ -30,9 +32,9 @@ import type {
   Option,
   Timepoint,
   Duration,
-} from "@stellar/stellar-sdk/no-eventsource/contract";
-export * as contract from "@stellar/stellar-sdk/no-eventsource/contract";
-export * as rpc from "@stellar/stellar-sdk/no-eventsource/rpc";
+} from "@stellar/stellar-sdk/contract";
+export * as contract from "@stellar/stellar-sdk/contract";
+export * as rpc from "@stellar/stellar-sdk/rpc";
 
 if (typeof window !== "undefined") {
   //@ts-ignore Buffer exists

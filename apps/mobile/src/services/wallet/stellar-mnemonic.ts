@@ -7,7 +7,7 @@ import {
   validateMnemonic,
 } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { Keypair } from "@stellar/stellar-base";
+import { Keypair } from "@stellar/stellar-sdk/base";
 import { Buffer } from "buffer";
 import { getRandomBytes } from "expo-crypto";
 

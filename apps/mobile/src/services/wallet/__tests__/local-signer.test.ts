@@ -6,7 +6,7 @@ import {
   Networks,
   Operation,
   TransactionBuilder,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 
 import { LocalSigner } from "../local-signer";
 import {

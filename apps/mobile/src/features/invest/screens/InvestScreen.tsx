@@ -1,4 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { Bell, Grid2X2 } from "lucide-react-native";
 import {
   ImageBackground,
@@ -10,33 +11,28 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type InvestmentAsset = {
+import { getKnownVaultsForNetwork } from "@/src/domain/earn/vault";
+import {
+  useVaults,
+  type VaultWithInfo,
+} from "@/src/features/invest/api/earn-queries";
+import { ScreenPlaceholder } from "@/src/features/shared/components/ScreenPlaceholder";
+import { Skeleton } from "@/src/features/shared/components/ui/skeleton";
+import { useActiveNetworkId } from "@/src/features/wallet/api/wallet-queries";
+import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
+import type { VaultInfo } from "@/src/services/api/earn/vault-info-service";
+
+type CardVariant = "usdc" | "xlm" | "generic";
+
+type InvestmentCardProps = {
   asset: string;
   description: string;
-  image: "usdc" | "xlm";
+  image?: "usdc" | "xlm";
   name: string;
+  onPress: () => void;
   symbol: "$" | "stellar";
-  variant: "usdc" | "xlm";
+  variant: CardVariant;
 };
-
-const INVESTMENT_ASSETS: InvestmentAsset[] = [
-  {
-    asset: "USDC",
-    description: "Stable growth asset",
-    image: "usdc",
-    name: "USD Coin",
-    symbol: "$",
-    variant: "usdc",
-  },
-  {
-    asset: "XLM",
-    description: "Fast global transfers",
-    image: "xlm",
-    name: "Stellar",
-    symbol: "stellar",
-    variant: "xlm",
-  },
-];
 
 const CARD_IMAGES = {
   usdc: require("@/src/assets/images/invest/usdc-card.png"),
@@ -58,7 +54,63 @@ const CARD_STYLES = {
     glow: "bg-[#159DFF]",
     symbol: "text-[#8DBAFF]",
   },
+  generic: {
+    coin: "bg-[#138BFF]",
+    coinShadow: "bg-[#0643A8]",
+    gradient: ["#087BFF", "#0064E8", "#021B55"] as const,
+    glow: "bg-[#40C8FF]",
+    symbol: "text-[#8DBAFF]",
+  },
 };
+
+function formatVaultTvl(info: VaultInfo): string {
+  const total = info.totalManagedFunds.reduce(
+    (sum, fund) => sum + fund.totalAmount,
+    0n
+  );
+
+  return total.toString();
+}
+
+function getVaultAssetLabel(name: string): string {
+  const firstWord = name.trim().split(/\s+/)[0];
+
+  return firstWord || name;
+}
+
+function getVaultCardProps(vault: VaultWithInfo): Omit<InvestmentCardProps, "onPress"> {
+  const nameLower = vault.name.toLowerCase();
+
+  if (nameLower.includes("usdc")) {
+    return {
+      asset: getVaultAssetLabel(vault.name),
+      description: `${formatVaultTvl(vault.info)} TVL`,
+      image: "usdc",
+      name: vault.name,
+      symbol: "$",
+      variant: "usdc",
+    };
+  }
+
+  if (nameLower.includes("xlm") || nameLower.includes("stellar")) {
+    return {
+      asset: getVaultAssetLabel(vault.name),
+      description: `${formatVaultTvl(vault.info)} TVL`,
+      image: "xlm",
+      name: vault.name,
+      symbol: "stellar",
+      variant: "xlm",
+    };
+  }
+
+  return {
+    asset: getVaultAssetLabel(vault.name),
+    description: `${formatVaultTvl(vault.info)} TVL`,
+    name: vault.name,
+    symbol: "$",
+    variant: "generic",
+  };
+}
 
 function StellarMark() {
   return (
@@ -75,9 +127,10 @@ function InvestmentCard({
   description,
   image,
   name,
+  onPress,
   symbol,
   variant,
-}: InvestmentAsset) {
+}: InvestmentCardProps) {
   const style = CARD_STYLES[variant];
 
   const content = (
@@ -99,7 +152,12 @@ function InvestmentCard({
 
   if (image) {
     return (
-      <Pressable accessibilityRole="button" className="mt-4" style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        className="mt-4"
+        onPress={onPress}
+        style={styles.card}
+      >
         <ImageBackground
           imageStyle={styles.cardImage}
           resizeMode="cover"
@@ -113,7 +171,12 @@ function InvestmentCard({
   }
 
   return (
-    <Pressable accessibilityRole="button" className="mt-4" style={styles.card}>
+    <Pressable
+      accessibilityRole="button"
+      className="mt-4"
+      onPress={onPress}
+      style={styles.card}
+    >
       <LinearGradient
         colors={style.gradient}
         start={{ x: 0, y: 0 }}
@@ -152,6 +215,79 @@ function InvestmentCard({
   );
 }
 
+function VaultListSection() {
+  const activeAccount = useActiveAccount();
+  const router = useRouter();
+  const networkId = useActiveNetworkId();
+  const knownVaults = getKnownVaultsForNetwork(networkId);
+  const vaultsQuery = useVaults(activeAccount?.publicKey);
+
+  if (!activeAccount) {
+    return (
+      <ScreenPlaceholder
+        description="Add or create a wallet to see available vaults."
+        eyebrow="Invest"
+        title="Connect a wallet"
+      />
+    );
+  }
+
+  if (vaultsQuery.isLoading) {
+    return (
+      <>
+        <Skeleton
+          className="mt-4 h-[236px] rounded-[20px]"
+          startColor="bg-[#242426]"
+        />
+        <Skeleton
+          className="mt-4 h-[236px] rounded-[20px]"
+          startColor="bg-[#242426]"
+        />
+      </>
+    );
+  }
+
+  if (vaultsQuery.isError) {
+    return (
+      <View className="mt-4 flex-row items-center justify-center gap-3">
+        <Text className="text-[15px] font-semibold text-[#77777B]">
+          Couldn&apos;t load vaults
+        </Text>
+        <Pressable accessibilityRole="button" onPress={() => vaultsQuery.refetch()}>
+          <Text className="text-[15px] font-semibold text-[#087BFF]">Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (knownVaults.length === 0 || vaultsQuery.data?.length === 0) {
+    return (
+      <ScreenPlaceholder
+        description="Vaults for this network aren't available yet, check back soon."
+        eyebrow="Invest"
+        title="No vaults yet"
+      />
+    );
+  }
+
+  return vaultsQuery.data!.map((vault) => {
+    const cardProps = getVaultCardProps(vault);
+
+    return (
+      <InvestmentCard
+        key={vault.id}
+        {...cardProps}
+        onPress={() =>
+          router.push({
+            pathname: "/invest/[vaultId]",
+            params: { vaultId: vault.id },
+          })
+        }
+      />
+    );
+  });
+}
+
 export function InvestScreen() {
   const insets = useSafeAreaInsets();
 
@@ -177,9 +313,7 @@ export function InvestScreen() {
         </Text>
 
         <View className="mt-4">
-          {INVESTMENT_ASSETS.map((asset) => (
-            <InvestmentCard key={asset.asset} {...asset} />
-          ))}
+          <VaultListSection />
         </View>
       </ScrollView>
     </View>

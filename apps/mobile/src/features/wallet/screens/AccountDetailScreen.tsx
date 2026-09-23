@@ -5,7 +5,7 @@ import {
   Keypair,
   Operation,
   TransactionBuilder,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 import { useState } from "react";
 import {
   ActivityIndicator,

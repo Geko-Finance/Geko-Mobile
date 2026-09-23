@@ -1,8 +1,14 @@
 /**
- * Runtime imports of `@stellar/stellar-sdk` are forbidden in app code: its Horizon
- * module pulls in the Node-only `eventsource` package that Metro cannot resolve.
- * Use type-only imports, `@stellar/typescript-wallet-sdk` (self-contained browser
- * bundle), or locally declared protocol constants instead.
+ * Runtime imports of the root `@stellar/stellar-sdk` entry point are forbidden in app
+ * code: its Horizon module pulls in the Node-only `eventsource` package that Metro
+ * cannot resolve. Use type-only imports from the root, or runtime imports from the
+ * `base`, `contract` and `rpc` submodules, which carry no Horizon dependency.
+ * `@stellar/typescript-wallet-sdk` (self-contained browser bundle) and locally declared
+ * protocol constants are the other safe options.
+ *
+ * SDK 16 absorbed `@stellar/stellar-base` into `@stellar/stellar-sdk/base` and dropped
+ * the old `minimal`/`no-axios`/`no-eventsource` build variants; those submodules are the
+ * replacement.
  */
 import type { Networks } from "@stellar/stellar-sdk";
 import { StellarConfiguration, Wallet } from "@stellar/typescript-wallet-sdk";

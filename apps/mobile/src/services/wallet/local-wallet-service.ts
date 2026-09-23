@@ -1,4 +1,4 @@
-import { Keypair } from "@stellar/stellar-base";
+import { Keypair } from "@stellar/stellar-sdk/base";
 import {
   KeyManager,
   KeyType,

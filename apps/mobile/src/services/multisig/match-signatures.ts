@@ -1,4 +1,4 @@
-import { Keypair, Transaction } from "@stellar/stellar-base";
+import { Keypair, Transaction } from "@stellar/stellar-sdk/base";
 
 import type { ProposalSignature, SignerEntry } from "@/src/domain/multisig";
 

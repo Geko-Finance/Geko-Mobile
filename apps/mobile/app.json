@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "geko-mobile",
+    "name": "Geko",
     "slug": "geko-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,9 +19,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/icons/iconAppSquare.png",
-        "backgroundImage": "./src/assets/icons/iconAppSquare.png",
-        "monochromeImage": "./src/assets/icons/iconAppSquare.png"
+        "foregroundImage": "./src/assets/icons/iconAppAdaptiveForeground.png",
+        "monochromeImage": "./src/assets/icons/iconAppAdaptiveMonochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

@@ -1,50 +1,91 @@
-# Welcome to your Expo app 👋
+# Geko Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The Expo app: a Stellar wallet with custodial (Cavos) and non-custodial accounts, multisig
+proposals, SEP-7 links and CCTP USDC transfers.
 
-## Get started
+Everything installs from the repo root, not from here. Start with the
+[root README](../../README.md) if this is your first run.
 
-1. Install dependencies
+## Prerequisites
 
-   ```bash
-   npm install
-   ```
+- The root setup done once: `npm install` and `npm run build` at the repo root.
+- `apps/mobile/.env` copied from `.env.example`. Every value has a working default for
+  local development except the Cavos app id.
+- The backend running on `:4000`, unless you point `EXPO_PUBLIC_BACKEND_URL` elsewhere.
+- Xcode or Android Studio for a simulator, or the Expo Go app on a physical device.
 
-2. Start the app
+## Running
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+From the repo root:
 
 ```bash
-npm run reset-project
+npm run dev -w geko-mobile
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Or from this directory:
 
-## Learn more
+| Command             | What it does                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| `npm run dev`       | Expo dev server for a development build                       |
+| `npm run ios`       | Build and run on the iOS simulator (needs Xcode)              |
+| `npm run android`   | Build and run on an Android emulator (needs Android Studio)   |
+| `npm run expo-go`   | Dev server over LAN for Expo Go, cache cleared                |
+| `npm run test`      | Jest, offline and fully mocked                                |
+| `npm run typecheck` | `tsc --noEmit`, regenerating typed routes first               |
+| `npm run lint`      | ESLint via `expo lint`                                        |
+| `npm run doctor`    | `expo-doctor` dependency and config checks                    |
 
-To learn more about developing your project with Expo, look at the following resources:
+**Expo Go is not the full app.** Native modules such as `expo-local-authentication` and
+`expo-secure-store` behave differently or not at all there, and both sit on the signing
+path. Use a development build for anything touching wallets, and never fund a wallet
+created in a debugged dev build: `expo-crypto` falls back to `Math.random()` when remote
+JS debugging is attached.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Layout
 
-## Join the community
+```
+app/                 # expo-router routes only: layouts and re-exports, no business logic
+src/
+  features/*         # product domains and their screens
+  domain/*           # business types shared across features
+  services/*         # API clients, storage, wallet, SEP-7, crypto
+  providers/*        # app-wide providers
+```
 
-Join our community of developers creating universal apps.
+Zustand owns local client state, TanStack Query owns server state, and `SecureStore` holds
+secrets and session tokens. `AsyncStorage` is for non-secret metadata only. The full
+conventions are in [CLAUDE.md](CLAUDE.md); deeper notes are in [docs/](docs).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Swaps
+
+The swap screen compares exact-input quotes from Soroswap and Stellar native strict-send
+path payments, then ranks them by destination amount after destination-denominated fees.
+All amount and slippage math uses integer stroops. The transaction is built by the chosen
+adapter, signed through the active wallet signer, and monitored through Horizon with
+TanStack Query.
+
+Soroswap requires `SOROSWAP_API_KEY` on the backend; the mobile bundle never receives the
+credential. Without it, the native Stellar route remains available. An issued destination
+asset must already have a trustline before the app enables quoting.
+
+## Typed routes
+
+`.expo/types/router.d.ts` is generated and gitignored. It is missing on a fresh clone and
+goes stale when routes move: missing types weaken `Href` to `string` and hide real
+mistakes, stale types invent errors for routes that do exist.
+
+`npm run typecheck` regenerates it first, through `pretypecheck`. To refresh it alone:
+
+```bash
+npm run types:routes
+```
+
+## Builds
+
+```bash
+npm run dev-ios-simulator-build      # EAS build for the iOS simulator
+npm run dev-android-simulator-build  # EAS development build for Android
+```
+
+EAS auto-detects the workspace root, so these run from this directory. Profiles live in
+[eas.json](eas.json).

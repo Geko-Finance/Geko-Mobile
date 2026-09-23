@@ -5,7 +5,7 @@ import {
   Operation,
   TransactionBuilder,
   type Signer,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 
 import { buildSetOptionsXdr } from "../set-options-xdr";
 

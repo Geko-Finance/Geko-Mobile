@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -13,6 +14,10 @@ import {
   SessionMeta,
 } from './auth.types';
 import { OAuthCallbackDto } from './dto/oauth-callback.dto';
+import {
+  isAllowedRedirectUri,
+  parseAllowedRedirectPrefixes,
+} from './oauth-redirect-uri';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import {
@@ -76,6 +81,16 @@ export class AuthService {
     provider: OAuthProvider,
     redirectUri: string,
   ): Promise<{ url: string }> {
+    // The redirect target is where the authorization code lands, so it is allow-listed
+    // here rather than trusted from the query string.
+    const allowedPrefixes = parseAllowedRedirectPrefixes(
+      this.configService.get<string>('OAUTH_ALLOWED_REDIRECT_PREFIXES'),
+    );
+
+    if (!isAllowedRedirectUri(redirectUri, allowedPrefixes)) {
+      throw new BadRequestException('redirectUri is not allowed');
+    }
+
     const url = await this.cavosVerificationProvider.getOAuthUrl(
       provider,
       redirectUri,

@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch makes the in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Expo SDK 54 supports Node 20/22; npm is pinned by the root `packageManager` field.
+  NODE_VERSION: "22"
+
+jobs:
+  checks:
+    name: typecheck / lint / test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Single hoisted lockfile at the repo root. Installing per workspace would
+      # leave `tsc`, `eslint` and `jest` unresolved.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore Turborepo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
+      # `.expo/types/router.d.ts` is generated and gitignored, so it never exists on a
+      # fresh checkout. Without it `Href` degrades to `string` and real route mistakes
+      # pass; with a stale copy, valid routes fail. `pretypecheck` also runs this, but
+      # keeping it explicit makes the guarantee visible in the log.
+      - name: Regenerate Expo typed routes
+        run: npm run types:routes --workspace geko-mobile
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # ESLint exits non-zero on errors only. The ~31 warnings from generated
+      # Gluestack UI files are known and documented in apps/mobile/CLAUDE.md.
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  expo-doctor:
+    name: expo-doctor (mobile)
+    runs-on: ubuntu-latest
+    # Reaches the npm registry and Expo's API, so it can go red for reasons unrelated
+    # to the PR. Deliberately kept out of the required checks for merge.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run expo-doctor
+        run: npx expo-doctor
+        working-directory: apps/mobile
+
+  migrations:
+    name: backend migrations (postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: geko
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/geko
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # TODO(#24): swap for `npm run db:migrate --workspace geko-backend` once that
+      # issue adds the script; it wraps this exact command.
+      - name: Apply migrations to an empty database
+        run: npx drizzle-kit migrate --config=drizzle.config.ts
+        working-directory: apps/backend
+
+      - name: Re-apply migrations (must be a no-op)
+        run: npx drizzle-kit migrate --config=drizzle.config.ts
+        working-directory: apps/backend
+
+      - name: Verify the expected schema exists
+        run: |
+          for table in users wallets wallet_secrets cross_border_transactions; do
+            psql "$DATABASE_URL" -tAc "select to_regclass('public.$table')" \
+              | grep -qx "$table" || { echo "missing table: $table"; exit 1; }
+          done
+          echo "all expected tables present"

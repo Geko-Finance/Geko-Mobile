@@ -9,8 +9,10 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
+import { OtpThrottlerGuard } from './guards/otp-throttler.guard';
 import { RefreshTokenGuard } from '../shared/guards/refresh-token.guard';
 import { AuthenticatedRequest } from '../shared/types/authenticated-request';
 import { OAuthProvider } from './auth.types';
@@ -24,12 +26,19 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // The global throttle (100/min) is far too loose in front of a numeric one-time code.
+  // These two routes get a tight limit, applied both per IP (global guard) and per email
+  // address (OtpThrottlerGuard), so rotating IPs does not buy extra attempts.
   @Post('otp/send')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @UseGuards(OtpThrottlerGuard)
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);
   }
 
   @Post('otp/verify')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseGuards(OtpThrottlerGuard)
   verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
     return this.authService.verifyOtp(dto, {
       ipAddress: req.ip,

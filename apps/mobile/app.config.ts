@@ -2,7 +2,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "geko-mobile",
+  name: "Geko",
   slug: "geko-mobile",
   version: "1.0.0",
   orientation: "portrait",
@@ -21,9 +21,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
-      foregroundImage: "./src/assets/icons/iconAppSquare.png",
-      backgroundImage: "./src/assets/icons/iconAppSquare.png",
-      monochromeImage: "./src/assets/icons/iconAppSquare.png",
+      foregroundImage: "./src/assets/icons/iconAppAdaptiveForeground.png",
+      monochromeImage: "./src/assets/icons/iconAppAdaptiveMonochrome.png",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,

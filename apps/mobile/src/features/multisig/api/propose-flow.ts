@@ -1,4 +1,4 @@
-import { Transaction, TransactionBuilder } from "@stellar/stellar-base";
+import { Transaction, TransactionBuilder } from "@stellar/stellar-sdk/base";
 
 import type {
   MultisigAccount,

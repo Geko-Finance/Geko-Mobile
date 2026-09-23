@@ -30,7 +30,9 @@ import { LoggingMiddleware } from './middleware/logging.middleware';
       useClass: ThrottlerGuard,
     },
   ],
-  exports: [JwtModule, JwtAuthGuard, RefreshTokenGuard],
+  // ThrottlerModule is re-exported so feature modules can register their own
+  // ThrottlerGuard subclasses (see auth/guards/otp-throttler.guard.ts).
+  exports: [JwtModule, JwtAuthGuard, RefreshTokenGuard, ThrottlerModule],
 })
 export class SharedModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

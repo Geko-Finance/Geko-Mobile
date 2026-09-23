@@ -6,7 +6,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { isLikelyStellarPublicKey } from "@/src/domain/wallet";
 import { BackButton } from "@/src/features/shared/components/BackButton";
-import { parseSep7PayUri } from "@/src/services/sep7/sep7-pay-uri";
+import { getActiveStellarNetwork } from "@/src/services/api/stellar/stellar-config";
+import {
+  assertSep7PayRequestUsable,
+  parseSep7PayUri,
+} from "@/src/services/sep7/sep7-pay-uri";
 import { Sep7ParseError, getSep7Operation, isSep7Uri } from "@/src/services/sep7/sep7-uri";
 
 export function ScanAddressScreen() {
@@ -27,6 +31,10 @@ export function ScanAddressScreen() {
     if (isSep7Uri(trimmed) && getSep7Operation(trimmed) === "pay") {
       try {
         const payRequest = parseSep7PayUri(trimmed);
+        assertSep7PayRequestUsable(
+          payRequest,
+          getActiveStellarNetwork().networkPassphrase
+        );
 
         setHandled(true);
         router.replace({

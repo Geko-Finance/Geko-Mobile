@@ -10,6 +10,7 @@ import { SharedModule } from './shared/shared.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { CrossBorderModule } from './cross-border/cross-border.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { SwapModule } from './swap/swap.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WalletsModule } from './wallets/wallets.module';
     WalletsModule,
     ContactsModule,
     CrossBorderModule,
+    SwapModule,
     NotificationsModule,
   ],
 })

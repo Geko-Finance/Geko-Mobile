@@ -3,7 +3,7 @@ import {
   FeeBumpTransaction,
   Operation,
   TransactionBuilder,
-} from "@stellar/stellar-base";
+} from "@stellar/stellar-sdk/base";
 
 import type {
   SignTransactionOptions,

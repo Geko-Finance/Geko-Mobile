@@ -1,7 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { Sep7ParseError } from "../sep7-uri";
-import { buildSep7PayUri, parseSep7PayUri } from "../sep7-pay-uri";
+import {
+  assertSep7PayRequestUsable,
+  buildSep7PayUri,
+  parseSep7PayUri,
+} from "../sep7-pay-uri";
 
 const DESTINATION = "GBRLUEXAMPLE0000000000000000000000000000000000000000000000";
 const ISSUER = "GISSUEREXAMPLE00000000000000000000000000000000000000000000";
@@ -96,5 +100,64 @@ describe("parseSep7PayUri error cases", () => {
     expect(() =>
       parseSep7PayUri(`web+stellar:pay?destination=${DESTINATION}&asset_issuer=${ISSUER}`),
     ).toThrow(Sep7ParseError);
+  });
+});
+
+describe("assertSep7PayRequestUsable", () => {
+  // Format-valid Stellar addresses; the DESTINATION/ISSUER constants above are readable
+  // placeholders that deliberately do not satisfy the public-key format check.
+  const REAL_DESTINATION =
+    "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+  const TESTNET = "Test SDF Network ; September 2015";
+  const PUBLIC = "Public Global Stellar Network ; September 2015";
+
+  const parse = (uri: string) => parseSep7PayUri(uri);
+
+  it("accepts a well-formed request with no network pinned", () => {
+    const request = parse(`web+stellar:pay?destination=${REAL_DESTINATION}`);
+
+    expect(() => assertSep7PayRequestUsable(request, TESTNET)).not.toThrow();
+  });
+
+  it("accepts a request pinned to the active network", () => {
+    const request = parse(
+      buildSep7PayUri({
+        destination: REAL_DESTINATION,
+        networkPassphrase: TESTNET,
+      }),
+    );
+
+    expect(() => assertSep7PayRequestUsable(request, TESTNET)).not.toThrow();
+  });
+
+  it("rejects a request pinned to a different network", () => {
+    const request = parse(
+      buildSep7PayUri({
+        destination: REAL_DESTINATION,
+        networkPassphrase: PUBLIC,
+      }),
+    );
+
+    expect(() => assertSep7PayRequestUsable(request, TESTNET)).toThrow(
+      Sep7ParseError,
+    );
+  });
+
+  it("rejects a destination that is not a Stellar public key", () => {
+    const request = parse("web+stellar:pay?destination=not-an-address");
+
+    expect(() => assertSep7PayRequestUsable(request, TESTNET)).toThrow(
+      Sep7ParseError,
+    );
+  });
+
+  it("rejects a muxed destination, which the send flow does not support", () => {
+    const request = parse(
+      `web+stellar:pay?destination=${REAL_DESTINATION.replace(/^G/, "M")}`,
+    );
+
+    expect(() => assertSep7PayRequestUsable(request, TESTNET)).toThrow(
+      Sep7ParseError,
+    );
   });
 });

@@ -20,6 +20,13 @@ import { useWalletStore } from "../state/wallet-store";
 
 export { isAccountNotFoundError };
 
+/**
+ * Horizon has no push channel wired into the app, so incoming payments are picked up by
+ * polling. Stellar closes a ledger every ~5s; 10s keeps the balance fresh without
+ * hammering Horizon. Polling pauses while the app is backgrounded (see AppProviders).
+ */
+const ACCOUNT_POLL_INTERVAL_MS = 10_000;
+
 /** TanStack Query key factory for wallet queries. */
 export const walletKeys = {
   all: ["wallet"] as const,
@@ -42,6 +49,8 @@ export function useAccountBalances(publicKey: string | undefined) {
     enabled: publicKey !== undefined,
     queryFn: () => getStellarClient().fetchAccountBalances(publicKey!),
     queryKey: walletKeys.balances(networkId, publicKey ?? "none"),
+    refetchInterval: ACCOUNT_POLL_INTERVAL_MS,
+    staleTime: 0,
     retry: (failureCount, error) =>
       !isAccountNotFoundError(error) && failureCount < 1,
   });
@@ -55,6 +64,8 @@ export function useAccountTransactions(publicKey: string | undefined) {
     enabled: publicKey !== undefined,
     queryFn: () => fetchAccountPayments(publicKey!, networkId),
     queryKey: walletKeys.transactions(networkId, publicKey ?? "none"),
+    refetchInterval: ACCOUNT_POLL_INTERVAL_MS,
+    staleTime: 0,
   });
 }
 

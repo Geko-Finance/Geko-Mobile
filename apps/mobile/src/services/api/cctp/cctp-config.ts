@@ -53,3 +53,12 @@ export const CCTP_IRIS_API_BASE_URL: Record<StellarNetworkId, string> = {
 export function getCctpStellarContracts(networkId: StellarNetworkId): CctpStellarContracts {
   return CCTP_STELLAR_CONTRACTS[networkId];
 }
+
+/**
+ * Sending USDC out of Stellar stays off until `depositForBurn` matches the deployed
+ * TokenMessengerMinter: the contract takes 8 arguments (caller, amount, destination
+ * domain, mint recipient, burn token, destination caller, max fee, min finality
+ * threshold) and the app passes 4, so every outbound burn would fail at simulation.
+ * Finishing an outbound transfer also needs a wallet on the destination chain.
+ */
+export const CCTP_OUTBOUND_ENABLED = false;

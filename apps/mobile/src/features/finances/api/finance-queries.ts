@@ -112,11 +112,13 @@ export function mergeFinanceEntries(
   crossBorderTransactions: CrossBorderTransaction[]
 ): FinanceEntry[] {
   const entriesByHash = new Map<string, FinanceEntry>();
-  const merged: FinanceEntry[] = stellarTransactions.map((transaction) => {
+  // Finance totals and charts are in XLM, so only native movements count here.
+  const xlmTransactions = stellarTransactions.filter((transaction) => transaction.assetCode === "XLM");
+  const merged: FinanceEntry[] = xlmTransactions.map((transaction) => {
     const entry: FinanceEntry = {
       id: transaction.hash,
       type: transaction.type,
-      amountXlm: transaction.amountXlm,
+      amountXlm: transaction.amount,
       counterparty: transaction.counterparty,
       createdAt: transaction.createdAt,
       pending: false,

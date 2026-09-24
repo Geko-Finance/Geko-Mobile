@@ -6,7 +6,7 @@ import { canTransition, type CctpTransfer, type CctpTransferStatus } from "@/src
 import { useSessionStore } from "@/src/features/auth/session/session-store";
 import { asyncStateStorage } from "@/src/services/storage/async-json-storage";
 
-interface CctpTransferState {
+export interface CctpTransferState {
   transfers: CctpTransfer[];
   upsertTransfer: (transfer: CctpTransfer) => void;
   /** Advances `id` to `status`, merging in any newly observed on-chain facts; no-ops (returns false) on an invalid transition. */
@@ -14,7 +14,7 @@ interface CctpTransferState {
     id: string,
     status: CctpTransferStatus,
     patch?: Partial<
-      Pick<CctpTransfer, "burnTxHash" | "messageBytes" | "attestation" | "mintTxHash">
+      Pick<CctpTransfer, "amount" | "burnTxHash" | "messageBytes" | "attestation" | "mintTxHash">
     >
   ) => boolean;
   markFailed: (id: string, step: CctpTransfer["failedStep"], reason: string) => void;

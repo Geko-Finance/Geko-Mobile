@@ -1,7 +1,12 @@
 import 'fake-indexeddb/auto';
 import '../../auth/providers/cavos-node-polyfill';
 
-import { Cavos, generateRecoveryCode } from '@cavos/kit';
+import {
+  CavosStellar,
+  generateRecoveryCode,
+  LocalDeviceUnwrapKey,
+  type WalletRegistry,
+} from '@cavos/kit';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WalletNeedsDeviceApprovalException } from '../exceptions/wallet-needs-device-approval.exception';
@@ -19,9 +24,50 @@ import type {
 
 type CavosNetwork = 'testnet' | 'mainnet';
 
-type StellarWallet = Awaited<ReturnType<typeof Cavos.connect>> & {
-  chain: 'stellar';
-};
+// Cavos's API names Stellar networks `stellar-testnet` / `stellar-mainnet`; the bare
+// `testnet` / `mainnet` values (still what CAVOS_NETWORK holds) are rejected.
+const STELLAR_NETWORK = {
+  testnet: 'stellar-testnet',
+  mainnet: 'stellar-mainnet',
+} as const;
+
+/**
+ * Wallet registry backed by Geko's own `wallets` row instead of Cavos's hosted one.
+ *
+ * `@cavos/kit` >= 0.1 resolves the address through `HttpWalletRegistry`, which needs a
+ * Cavos end-user login token. The backend never holds one (identity.userId is Geko's
+ * internal user id, not a Cavos subject), and Geko's database is already the source of
+ * truth for which address belongs to which user — so the registry is just that address.
+ */
+class GekoWalletRegistry implements WalletRegistry {
+  constructor(private readonly address: string | null) {}
+
+  async lookup(): Promise<{ address: string } | null> {
+    return this.address ? { address: this.address } : null;
+  }
+
+  async register(params: {
+    address: string;
+  }): Promise<{ address: string; conflict: boolean }> {
+    if (this.address) {
+      return {
+        address: this.address,
+        conflict: this.address !== params.address,
+      };
+    }
+    return { address: params.address, conflict: false };
+  }
+}
+
+/**
+ * `CavosStellar` is lazy-deploy since @cavos/kit 0.1: connect never creates the account,
+ * the first `execute()` payment does. Geko needs the account (and its recovery signer)
+ * on-chain right after provisioning — the control key lives only in this process's
+ * in-memory IndexedDB, so an account left undeployed would be unrecoverable after a
+ * restart. The SDK exposes no public create-only call, so reach its internal one; the
+ * dependency is pinned to an exact version because of this.
+ */
+type StellarAccountCreator = { _createAccount?: () => Promise<unknown> };
 
 @Injectable()
 export class CavosCustodialWalletProvider
@@ -69,25 +115,18 @@ export class CavosCustodialWalletProvider
     }
 
     // Initial creation — no wallets row / wallet.id yet, so connect directly
-    // (not via connectStellarWallet). Recovery-code setup happens in
-    // finalizeProvisioning once a wallet.id exists.
-    const wallet = await Cavos.connect({
-      appId: this.appId,
-      appSalt: this.appSalt,
-      chain: 'stellar',
-      identity: { userId: input.userId },
-      network: this.network,
-    });
-
-    if (wallet.chain !== 'stellar') {
-      throw new Error(
-        'Expected Stellar wallet from Cavos.connect with chain: stellar',
-      );
-    }
+    // (not via connectStellarWallet). Recovery-code setup and the on-chain account
+    // creation happen in finalizeProvisioning once a wallet.id exists.
+    const wallet = await this.connect(input.userId, null);
 
     return {
       publicAddress: wallet.address,
-      status: this.mapWalletStatus(wallet.status),
+      // `undeployed` is transient here: finalizeProvisioning creates the account in
+      // the same request.
+      status:
+        wallet.status === 'undeployed'
+          ? 'ready'
+          : this.mapWalletStatus(wallet.status),
       providerDetails: {
         cavosUserId: input.userId,
         network: this.network,
@@ -152,19 +191,7 @@ export class CavosCustodialWalletProvider
     wallet: WalletRecord,
     recoveryCode: string,
   ): Promise<{ status: 'ready' }> {
-    const connected = await Cavos.connect({
-      appId: this.appId,
-      appSalt: this.appSalt,
-      chain: 'stellar',
-      identity: { userId: wallet.userId },
-      network: this.network,
-    });
-
-    if (connected.chain !== 'stellar') {
-      throw new Error(
-        'Expected Stellar wallet from Cavos.connect with chain: stellar',
-      );
-    }
+    const connected = await this.connect(wallet.userId, wallet.publicAddress);
 
     if (connected.status === 'needs-device-approval') {
       // Explicit new-device recovery: use the user-supplied code, not the stored one.
@@ -194,20 +221,8 @@ export class CavosCustodialWalletProvider
    */
   private async connectStellarWallet(
     wallet: WalletRecord,
-  ): Promise<{ wallet: StellarWallet; freshRecoveryCode?: string }> {
-    const connected = await Cavos.connect({
-      appId: this.appId,
-      appSalt: this.appSalt,
-      chain: 'stellar',
-      identity: { userId: wallet.userId },
-      network: this.network,
-    });
-
-    if (connected.chain !== 'stellar') {
-      throw new Error(
-        'Expected Stellar wallet from Cavos.connect with chain: stellar',
-      );
-    }
+  ): Promise<{ wallet: CavosStellar; freshRecoveryCode?: string }> {
+    const connected = await this.connect(wallet.userId, wallet.publicAddress);
 
     if (connected.status === 'needs-device-approval') {
       const code = await this.walletSecretsService.getRecoveryCode(wallet.id);
@@ -229,19 +244,59 @@ export class CavosCustodialWalletProvider
 
     if (!existingCode) {
       const code = generateRecoveryCode();
+      // On an undeployed account this only queues the recovery signer; deploy()
+      // below writes it on-chain together with the account.
       await connected.setupRecovery(code);
+      await this.deploy(connected);
       await this.walletSecretsService.saveRecoveryCode(wallet.id, code);
       await this.walletsRepository.updateCustodialRecoverySetAt(
         wallet.id,
         new Date(),
       );
       return {
-        wallet: connected as StellarWallet,
+        wallet: connected,
         freshRecoveryCode: code,
       };
     }
 
-    return { wallet: connected as StellarWallet };
+    await this.deploy(connected);
+    return { wallet: connected };
+  }
+
+  /**
+   * identity.userId is always Geko's internal user id — see connectStellarWallet.
+   * `knownAddress` is the wallets row's address, or null before the row exists.
+   */
+  private async connect(
+    userId: string,
+    knownAddress: string | null,
+  ): Promise<CavosStellar> {
+    return CavosStellar.connect({
+      appId: this.appId,
+      appSalt: this.appSalt,
+      identity: { userId },
+      network: STELLAR_NETWORK[this.network],
+      registry: new GekoWalletRegistry(knownAddress),
+      // Only read on Cavos's enclave/passkey (MasterDEK) path, which this backend
+      // does not use; the classic control-key path ignores it.
+      deviceKey: LocalDeviceUnwrapKey.generate(),
+    });
+  }
+
+  private async deploy(connected: CavosStellar): Promise<void> {
+    if (connected.status !== 'undeployed') {
+      return;
+    }
+
+    const creator = connected as unknown as StellarAccountCreator;
+    if (typeof creator._createAccount !== 'function') {
+      throw new Error(
+        'Installed @cavos/kit no longer exposes CavosStellar._createAccount; ' +
+          're-check the eager-deploy path in CavosCustodialWalletProvider.',
+      );
+    }
+
+    await creator._createAccount.call(connected);
   }
 
   private mapWalletStatus(

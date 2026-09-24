@@ -15,7 +15,7 @@ export type Sep7UriResult =
 /**
  * Shared entry point for any way a SEP-7 `web+stellar:` link can reach this app - scanning a
  * QR in Sep7ScanScreen, or the OS handing the app an already-tapped link via the native
- * `web+stellar:` scheme registration (see app.json + useSep7LinkingListener). Both paths fully
+ * `web+stellar:` scheme registration (see app.config.ts + useSep7LinkingListener). Both paths fully
  * validate/classify/record the envelope identically; only how the raw string arrives differs.
  *
  * Returns `"ignored"` for a non-SEP-7 string rather than throwing, since the native `Linking`

@@ -9,7 +9,7 @@ import { handleSep7Uri } from "./handle-sep7-uri";
 
 /**
  * Registers the app to receive `web+stellar:` links opened outside the app (see the
- * `expo.scheme` array in app.json - this requires a fresh native build to take effect, a JS
+ * `scheme` array in app.config.ts - this requires a fresh native build to take effect, a JS
  * change alone does not register the OS-level scheme on an already-installed dev client).
  * Non-SEP-7 URLs (this app's own `gekomobile://` links) are silently ignored - the auth
  * OAuth-callback flow already owns those via its own WebBrowser session, not this listener.

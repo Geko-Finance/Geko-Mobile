@@ -7,8 +7,16 @@ import {
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { useMemo, useState } from "react";
+import {
+  Animated,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useCallback, useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { canSend } from "@/src/domain/wallet";
@@ -46,6 +54,18 @@ export function HomeScreen() {
   const networkId = useActiveNetworkId();
   const [selectedPeriod, setSelectedPeriod] =
     useState<TransactionPeriod>("month");
+  const [refreshing, setRefreshing] = useState(false);
+  const { refetch: refetchBalances } = balances;
+  const { refetch: refetchTransactions } = transactions;
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await Promise.all([refetchBalances(), refetchTransactions()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchBalances, refetchTransactions]);
   const scrollY = useMemo(() => new Animated.Value(0), []);
   const stickyOpacity = useMemo(
     () =>
@@ -171,6 +191,14 @@ export function HomeScreen() {
         contentContainerClassName="px-5 pb-10"
         contentContainerStyle={{ paddingTop: insets.top + 16 }}
         onScroll={handleScroll}
+        refreshControl={
+          <RefreshControl
+            progressViewOffset={insets.top}
+            refreshing={refreshing}
+            tintColor="#FFFFFF"
+            onRefresh={() => void handleRefresh()}
+          />
+        }
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >

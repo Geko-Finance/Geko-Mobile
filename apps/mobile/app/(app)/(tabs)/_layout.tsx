@@ -22,13 +22,6 @@ export default function AppTabsLayout() {
         />
         <Label>Finances</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="ai">
-        <Icon
-          sf="sparkles"
-          androidSrc={require("./assets/tab-ai.png")}
-        />
-        <Label>AI</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="invest">
         <Icon
           sf={{ default: "chart.bar", selected: "chart.bar.fill" }}

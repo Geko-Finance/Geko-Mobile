@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronDown, ChevronRight, QrCode } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { BookUser, ChevronDown, ChevronRight, QrCode } from "lucide-react-native";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -10,8 +10,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import type { Contact } from "@/src/domain/contacts";
 import { canSend, isLikelyStellarPublicKey } from "@/src/domain/wallet";
-import { useAccountBalances } from "@/src/features/wallet/api/wallet-queries";
+import { useContacts } from "@/src/features/contacts/api/contacts-queries";
+import { ContactPicker } from "@/src/features/contacts/components/ContactPicker";
+import {
+  useAccountBalances,
+  useActiveNetworkId,
+} from "@/src/features/wallet/api/wallet-queries";
 import { BackButton } from "@/src/features/shared/components/BackButton";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 
@@ -43,6 +49,31 @@ export function SendPaymentScreen() {
   } | null>(null);
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [memo, setMemo] = useState("");
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const networkId = useActiveNetworkId();
+  const contacts = useContacts();
+  const trimmedDestinationForLookup = destination.trim();
+  const destinationContact = useMemo(
+    () =>
+      contacts.find(
+        (contact) =>
+          contact.network === networkId &&
+          contact.address === trimmedDestinationForLookup
+      ),
+    [contacts, networkId, trimmedDestinationForLookup]
+  );
+
+  const selectContact = (contact: Contact) => {
+    setDestination(contact.address);
+    setEditingDestination(false);
+    setContactPickerOpen(false);
+
+    // A saved memo is usually what the recipient needs (exchange deposits); only fill it
+    // when the user hasn't typed one, and never clear theirs.
+    if (contact.memo !== undefined) {
+      setMemo((current) => (current.trim().length > 0 ? current : contact.memo!));
+    }
+  };
 
   // Two mutually exclusive prefill sources, by construction: ScanAddressScreen routes here
   // with EITHER `scannedAddress` alone (bare-address scan) OR the full pay-request param set
@@ -176,12 +207,26 @@ export function SendPaymentScreen() {
           >
             <View className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1E20]">
               <Text className="text-[13px] font-extrabold text-white">
-                {trimmedDestination.slice(0, 2)}
+                {destinationContact?.label.slice(0, 2).toUpperCase() ??
+                  trimmedDestination.slice(0, 2)}
               </Text>
             </View>
-            <Text className="ml-3 flex-1 text-[15px] font-bold text-white">
-              {`${trimmedDestination.slice(0, 6)}…${trimmedDestination.slice(-6)}`}
-            </Text>
+            <View className="ml-3 flex-1">
+              {destinationContact !== undefined ? (
+                <Text className="text-[15px] font-bold text-white">
+                  {destinationContact.label}
+                </Text>
+              ) : null}
+              <Text
+                className={
+                  destinationContact !== undefined
+                    ? "mt-0.5 text-[12px] font-semibold text-[#8E8E92]"
+                    : "text-[15px] font-bold text-white"
+                }
+              >
+                {`${trimmedDestination.slice(0, 6)}…${trimmedDestination.slice(-6)}`}
+              </Text>
+            </View>
             <ChevronRight color="#77777B" size={18} strokeWidth={2.5} />
           </Pressable>
         ) : (
@@ -200,6 +245,16 @@ export function SendPaymentScreen() {
                 }}
               />
               <Pressable
+                accessibilityLabel="Choose from contacts"
+                accessibilityRole="button"
+                className="h-12 w-12 items-center justify-center rounded-xl bg-[#1E1E20]"
+                onPress={() => setContactPickerOpen(true)}
+              >
+                <BookUser color="#FFFFFF" size={20} strokeWidth={2.25} />
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Scan QR code"
+                accessibilityRole="button"
                 className="h-12 w-12 items-center justify-center rounded-xl bg-[#1E1E20]"
                 onPress={() => router.push("/payments/scan")}
               >
@@ -363,6 +418,12 @@ export function SendPaymentScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+      <ContactPicker
+        networkId={networkId}
+        visible={contactPickerOpen}
+        onClose={() => setContactPickerOpen(false)}
+        onSelect={selectContact}
+      />
     </SafeAreaView>
   );
 }

@@ -1,15 +1,38 @@
 import { useRouter } from "expo-router";
-import { ArrowUpRight, ChevronRight, Globe, QrCode } from "lucide-react-native";
+import {
+  ArrowUpRight,
+  BookUser,
+  ChevronRight,
+  Globe,
+  QrCode,
+} from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import type { Contact } from "@/src/domain/contacts";
 import { canSend } from "@/src/domain/wallet";
+import { ContactPicker } from "@/src/features/contacts/components/ContactPicker";
 import { BackButton } from "@/src/features/shared/components/BackButton";
+import { useActiveNetworkId } from "@/src/features/wallet/api/wallet-queries";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
 
 export function SendOptionsScreen() {
   const router = useRouter();
   const activeAccount = useActiveAccount();
+  const networkId = useActiveNetworkId();
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+
+  const sendToContact = (contact: Contact) => {
+    setContactPickerOpen(false);
+    router.push({
+      pathname: "/payments/send",
+      params: {
+        destination: contact.address,
+        ...(contact.memo !== undefined ? { memo: contact.memo } : {}),
+      },
+    });
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -60,6 +83,23 @@ export function SendOptionsScreen() {
 
         <View className="mt-6 overflow-hidden rounded-[20px] bg-[#121214]">
           <Pressable
+            accessibilityRole="button"
+            className="flex-row items-center border-b border-[#1E1E20] px-4 py-4"
+            onPress={() => setContactPickerOpen(true)}
+          >
+            <View className="h-11 w-11 items-center justify-center rounded-full bg-[#1E1E20]">
+              <BookUser color="#FFFFFF" size={20} strokeWidth={2.25} />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-[15px] font-bold text-white">Contacts</Text>
+              <Text className="mt-0.5 text-[13px] font-semibold text-[#8E8E92]">
+                Send to someone you&apos;ve saved
+              </Text>
+            </View>
+            <ChevronRight color="#77777B" size={18} strokeWidth={2.5} />
+          </Pressable>
+
+          <Pressable
             className="flex-row items-center border-b border-[#1E1E20] px-4 py-4"
             onPress={() => router.push("/payments/scan")}
           >
@@ -101,6 +141,12 @@ export function SendOptionsScreen() {
           </Text>
         ) : null}
       </ScrollView>
+      <ContactPicker
+        networkId={networkId}
+        visible={contactPickerOpen}
+        onClose={() => setContactPickerOpen(false)}
+        onSelect={sendToContact}
+      />
     </SafeAreaView>
   );
 }

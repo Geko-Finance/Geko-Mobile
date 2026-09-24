@@ -53,6 +53,7 @@ export default function AppLayout() {
       <Stack.Screen name="wallet/create" />
       <Stack.Screen name="wallet/import" />
       <Stack.Screen name="contacts/index" />
+      <Stack.Screen name="notifications/index" />
       <Stack.Screen name="payments/send-options" />
       <Stack.Screen name="payments/send" />
       <Stack.Screen name="payments/receive" />

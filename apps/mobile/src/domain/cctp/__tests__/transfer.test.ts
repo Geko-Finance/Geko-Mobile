@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canAutoCompleteMint,
   canTransition,
+  isAwaitingAttestation,
   isResumable,
   isTerminalStatus,
   nextStep,
@@ -63,6 +64,21 @@ describe("isTerminalStatus / isResumable", () => {
     expect(isResumable({ ...BASE, status: "failed" })).toBe(true);
     expect(isResumable({ ...BASE, status: "attesting" })).toBe(true);
     expect(isResumable({ ...BASE, status: "minted" })).toBe(false);
+  });
+
+  it("doesn't count an outbound transfer waiting to be claimed on the other network as resumable - this wallet can't finish it", () => {
+    expect(isResumable({ ...BASE, direction: "stellar_to_remote", status: "attested" })).toBe(false);
+    expect(isResumable({ ...BASE, direction: "remote_to_stellar", status: "attested" })).toBe(true);
+  });
+});
+
+describe("isAwaitingAttestation", () => {
+  it("is true only while Circle's attestation is outstanding, so polling keeps going through fetch errors", () => {
+    expect(isAwaitingAttestation({ ...BASE, status: "burned" })).toBe(true);
+    expect(isAwaitingAttestation({ ...BASE, status: "attesting" })).toBe(true);
+    expect(isAwaitingAttestation({ ...BASE, status: "attested" })).toBe(false);
+    expect(isAwaitingAttestation({ ...BASE, status: "failed" })).toBe(false);
+    expect(isAwaitingAttestation(undefined)).toBe(false);
   });
 });
 

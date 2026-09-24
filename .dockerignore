@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+output
+apps/mobile/*
+!apps/mobile/package.json
+apps/server
+packages/*/src
+packages/*/dist
+**/coverage
+**/.DS_Store

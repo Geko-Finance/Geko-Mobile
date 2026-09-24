@@ -10,7 +10,7 @@ import type { CctpChainId } from "./chain";
  *
  * `remote_to_stellar`: USDC was already burned on a remote chain (by this user, in
  * another wallet); this wallet completes the transfer end-to-end by fetching the
- * attestation and minting into a Stellar account via Soroban `receive_message`, which
+ * attestation and minting into a Stellar account via CctpForwarder `mint_and_forward`, which
  * this app's `WalletSigner` can sign. This is the only direction this app can drive
  * fully autonomously, since every step that requires a signature happens on Stellar.
  */
@@ -78,9 +78,26 @@ export function isTerminalStatus(status: CctpTransferStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-/** Whether this transfer is mid-flight and can be resumed after an app restart. */
+/**
+ * Whether this transfer is mid-flight and can be resumed after an app restart. An
+ * outbound transfer that Circle has confirmed is excluded: its last step is a mint on
+ * the other network, which this wallet can't sign (see `canAutoCompleteMint`).
+ */
 export function isResumable(transfer: CctpTransfer): boolean {
+  if (transfer.status === "attested" && !canAutoCompleteMint(transfer.direction)) {
+    return false;
+  }
+
   return !isTerminalStatus(transfer.status) || transfer.status === "failed";
+}
+
+/**
+ * Whether Circle's attestation is still outstanding. Drives attestation polling from
+ * the persisted status rather than from the last fetch result, so a failed or 404
+ * fetch never stops polling on its own.
+ */
+export function isAwaitingAttestation(transfer: CctpTransfer | undefined): boolean {
+  return transfer !== undefined && (transfer.status === "burned" || transfer.status === "attesting");
 }
 
 const VALID_TRANSITIONS: Record<CctpTransferStatus, readonly CctpTransferStatus[]> = {
@@ -112,7 +129,7 @@ export function canAutoCompleteMint(direction: CctpTransferDirection): boolean {
  *
  * `"verify_burn"` is deliberately distinct from `"burn"`: unlike minting (CCTP's
  * MessageTransmitter rejects a replayed message on-chain, so re-submitting a mint is
- * protocol-safe - see receiveMessage's doc comment), a burn has no on-chain
+ * protocol-safe - see mintAndForward's doc comment), a burn has no on-chain
  * idempotency guard. If the app is killed after `deposit_for_burn` is submitted but
  * before `burnTxHash` is persisted (status stuck at `"burning"`), we cannot tell
  * "never actually sent" from "sent, just not recorded" - blindly resubmitting could

@@ -54,12 +54,41 @@ export class CavosVerificationProvider {
     _provider: OAuthProvider,
     authData: string,
   ): Promise<VerifiedIdentity> {
-    const identity = await this.cavosAuth.handleCallback(authData.trim());
+    const callback = authData.trim();
+    const identity = await this.cavosAuth.handleCallback(
+      callback,
+      callbackRedirectUri(callback),
+    );
 
     return {
       providerSubject: identity.userId,
       email: identity.email,
       name: identity.name,
     };
+  }
+}
+
+const CALLBACK_RESULT_PARAMS = ['cavos_auth_code', 'auth_data', 'zk_auth_data'];
+
+/**
+ * Cavos's v2 OAuth returns a one-time `cavos_auth_code` that CavosAuth exchanges
+ * together with the redirect URI it was issued for. In a browser the SDK reads that
+ * from `window.location`; here the mobile app posts the full callback URL instead,
+ * so the redirect URI is that URL minus the result params. Returns undefined for
+ * non-URL input (a legacy `auth_data` payload needs no redirect URI).
+ */
+function callbackRedirectUri(callback: string): string | undefined {
+  if (!callback.includes('://')) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(callback);
+    for (const param of CALLBACK_RESULT_PARAMS) {
+      url.searchParams.delete(param);
+    }
+    return url.toString();
+  } catch {
+    return undefined;
   }
 }

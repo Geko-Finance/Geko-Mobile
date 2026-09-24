@@ -1,7 +1,11 @@
+import { appConfig } from "@/src/config/env";
 import {
   canAutoCompleteMint,
+  decodeCctpV2BurnMessage,
   getCctpChain,
   nextStep,
+  parseForwarderHookData,
+  unitsToRemoteAmount,
   type CctpChainId,
   type CctpTransfer,
   type CctpTransferDirection,
@@ -12,10 +16,11 @@ import {
   CctpAttestationPendingError,
   depositForBurn,
   fetchCctpAttestation,
-  receiveMessage,
+  mintAndForward,
+  stellarForwarderMintRecipientHex,
 } from "@/src/services/api/cctp";
 
-import { useCctpTransferStore } from "../state/transfer-store";
+import { useCctpTransferStore, type CctpTransferState } from "../state/transfer-store";
 
 /**
  * Orchestration for a single CCTP transfer's lifecycle, mirroring
@@ -39,6 +44,49 @@ export class CctpFlowError extends Error {
     super(message);
     this.name = "CctpFlowError";
   }
+}
+
+/**
+ * `store.advance` returns `false` (and changes nothing) for a transition the state
+ * machine forbids. Every step here depends on the previous one having landed, so
+ * treat that as a bug to surface, never as a silent no-op.
+ */
+function advanceOrThrow(...args: Parameters<CctpTransferState["advance"]>): void {
+  const [id, status] = args;
+
+  if (!useCctpTransferStore.getState().advance(...args)) {
+    throw new Error(`Invalid CCTP transition for transfer ${id} to "${status}"`);
+  }
+}
+
+/** Circle confirmed a message that doesn't deliver to this wallet - never mint it. */
+export class CctpMessageMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CctpMessageMismatchError";
+  }
+}
+
+/**
+ * For an inbound transfer, checks the attested message really delivers to this
+ * wallet - Stellar domain, routed through our CctpForwarder, with this account in the
+ * hook data - and returns the amount it carries (net of any fast-transfer fee). The
+ * user only typed a tx hash, so the message is the only trustworthy source for both.
+ */
+function verifyInboundMessage(transfer: CctpTransfer, messageBytes: string): { amount: string } {
+  const message = decodeCctpV2BurnMessage(messageBytes);
+  const forwarder = stellarForwarderMintRecipientHex(appConfig.stellarNetwork);
+  const deliversHere =
+    message.destinationDomain === getCctpChain("stellar").domainId &&
+    message.mintRecipient === forwarder &&
+    message.destinationCaller === forwarder &&
+    parseForwarderHookData(message.hookData) === transfer.stellarPublicKey;
+
+  if (!deliversHere) {
+    throw new CctpMessageMismatchError("This transfer isn't headed to this wallet.");
+  }
+
+  return { amount: unitsToRemoteAmount(message.amount - message.feeExecuted) };
 }
 
 function requireTransfer(id: string): CctpTransfer {
@@ -104,7 +152,7 @@ export async function runBurnStep(input: RunBurnStepInput): Promise<CctpTransfer
     );
   }
 
-  store.advance(transfer.id, "burning");
+  advanceOrThrow(transfer.id, "burning");
 
   try {
     const { burnTxHash } = await depositForBurn({
@@ -115,7 +163,7 @@ export async function runBurnStep(input: RunBurnStepInput): Promise<CctpTransfer
       signer: input.signer,
     });
 
-    store.advance(transfer.id, "burned", { burnTxHash });
+    advanceOrThrow(transfer.id, "burned", { burnTxHash });
   } catch (error) {
     store.markFailed(transfer.id, "burn", messageOf(error));
     throw error;
@@ -129,10 +177,9 @@ export function recordExternalBurn(
   input: StartTransferInput & { readonly burnTxHash: string }
 ): CctpTransfer {
   createTransfer(input);
-  const store = useCctpTransferStore.getState();
 
-  store.advance(input.id, "burning");
-  store.advance(input.id, "burned", { burnTxHash: input.burnTxHash });
+  advanceOrThrow(input.id, "burning");
+  advanceOrThrow(input.id, "burned", { burnTxHash: input.burnTxHash });
 
   return requireTransfer(input.id);
 }
@@ -157,8 +204,10 @@ export async function pollAttestationStep(transferId: string): Promise<CctpTrans
     return transfer;
   }
 
-  if (transfer.status === "burned") {
-    store.advance(transferId, "attesting");
+  // `failed` covers a retry after an earlier attestation failure - it must re-enter
+  // `attesting` first, since the state machine only reaches `attested` from there.
+  if (transfer.status === "burned" || transfer.status === "failed") {
+    advanceOrThrow(transferId, "attesting");
   }
 
   if (transfer.burnTxHash === undefined) {
@@ -171,13 +220,16 @@ export async function pollAttestationStep(transferId: string): Promise<CctpTrans
       transfer.burnTxHash
     );
 
-    store.advance(transferId, "attested", { messageBytes, attestation });
+    const verified =
+      transfer.direction === "remote_to_stellar" ? verifyInboundMessage(transfer, messageBytes) : {};
+
+    advanceOrThrow(transferId, "attested", { messageBytes, attestation, ...verified });
   } catch (error) {
     if (error instanceof CctpAttestationPendingError) {
       return requireTransfer(transferId);
     }
 
-    if (error instanceof CctpAttestationFailedError) {
+    if (error instanceof CctpAttestationFailedError || error instanceof CctpMessageMismatchError) {
       store.markFailed(transferId, "attestation", messageOf(error));
     }
 
@@ -192,7 +244,7 @@ export interface CompleteMintStepInput {
   readonly signer: WalletSigner;
 }
 
-/** Signs and submits `receive_message` on Stellar. Only ever valid for `remote_to_stellar` transfers - see CctpTransfer's direction doc. */
+/** Signs and submits CctpForwarder `mint_and_forward` on Stellar. Only ever valid for `remote_to_stellar` transfers - see CctpTransfer's direction doc. */
 export async function completeMintStep(input: CompleteMintStepInput): Promise<CctpTransfer> {
   const transfer = requireTransfer(input.transferId);
 
@@ -216,17 +268,17 @@ export async function completeMintStep(input: CompleteMintStepInput): Promise<Cc
     throw new Error(`Transfer ${transfer.id} is missing its message/attestation`);
   }
 
-  store.advance(transfer.id, "minting");
+  advanceOrThrow(transfer.id, "minting");
 
   try {
-    const { mintTxHash } = await receiveMessage({
+    const { mintTxHash } = await mintAndForward({
       messageBytesHex: transfer.messageBytes,
       attestationHex: transfer.attestation,
       sourcePublicKey: transfer.stellarPublicKey,
       signer: input.signer,
     });
 
-    store.advance(transfer.id, "minted", { mintTxHash });
+    advanceOrThrow(transfer.id, "minted", { mintTxHash });
   } catch (error) {
     store.markFailed(transfer.id, "mint", messageOf(error));
     throw error;

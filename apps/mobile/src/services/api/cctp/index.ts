@@ -6,12 +6,17 @@ export {
   CctpAttestationPendingError,
   CctpProviderUnavailableError,
 } from "./cctp-errors";
-export type { DepositForBurnInput, ReceiveMessageInput } from "./cctp-stellar-contract";
+export type { DepositForBurnInput, MintAndForwardInput } from "./cctp-stellar-contract";
 export {
   buildCctpForwarderHookData,
   depositForBurn,
   evmAddressToMintRecipientHex,
-  receiveMessage,
+  mintAndForward,
   stellarForwarderMintRecipientHex,
 } from "./cctp-stellar-contract";
-export { CCTP_IRIS_API_BASE_URL, getCctpStellarContracts, usdcIssuer } from "./cctp-config";
+export {
+  CCTP_IRIS_API_BASE_URL,
+  CCTP_OUTBOUND_ENABLED,
+  getCctpStellarContracts,
+  usdcIssuer,
+} from "./cctp-config";

@@ -6,6 +6,7 @@ import {
   Send,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,8 +22,10 @@ import { TransactionRow } from "@/src/features/home/components/TransactionRow";
 import {
   useAccountBalances,
   useAccountTransactions,
+  useActiveNetworkId,
 } from "@/src/features/wallet/api/wallet-queries";
 import { useActiveAccount } from "@/src/features/wallet/state/wallet-store";
+import { stellarTxUrl } from "@/src/services/api/explorers";
 
 type TransactionPeriod = "today" | "week" | "month";
 
@@ -40,6 +43,7 @@ export function HomeScreen() {
   const activeAccount = useActiveAccount();
   const balances = useAccountBalances(activeAccount?.publicKey);
   const transactions = useAccountTransactions(activeAccount?.publicKey);
+  const networkId = useActiveNetworkId();
   const [selectedPeriod, setSelectedPeriod] =
     useState<TransactionPeriod>("month");
   const scrollY = useMemo(() => new Animated.Value(0), []);
@@ -107,7 +111,7 @@ export function HomeScreen() {
 
         return {
           id: entry.id,
-          amount: `${isReceived ? "+" : "-"}${Number(entry.amountXlm).toFixed(2)} XLM`,
+          amount: `${isReceived ? "+" : "-"}${Number(entry.amount).toFixed(2)} ${entry.assetCode}`,
           amountTone: isReceived ? ("green" as const) : ("red" as const),
           icon: isReceived ? ArrowDown : Send,
           meta: `${createdAt.toLocaleDateString(undefined, {
@@ -117,10 +121,12 @@ export function HomeScreen() {
             hour: "numeric",
             minute: "2-digit",
           })}`,
-          title: `${entry.counterparty.slice(0, 4)}...${entry.counterparty.slice(-4)}`,
+          // EVM senders (CCTP) keep their "0x" prefix plus 4 characters, like wallets show them.
+          title: `${entry.counterparty.slice(0, entry.counterparty.startsWith("0x") ? 6 : 4)}...${entry.counterparty.slice(-4)}`,
+          onPress: () => void WebBrowser.openBrowserAsync(stellarTxUrl(networkId, entry.hash)),
         };
       });
-  }, [selectedPeriod, transactions.data]);
+  }, [networkId, selectedPeriod, transactions.data]);
 
   if (activeAccount === null) {
     return (

@@ -114,12 +114,35 @@ npx drizzle-kit migrate --config=drizzle.config.ts
 
 Ensure `DATABASE_URL` is set (see `.env.example`).
 
+Production applies the same migrations from the compiled build with `npm run migrate:prod`,
+which needs only `drizzle-orm`. Applied migrations are tracked in
+`drizzle.__drizzle_migrations`, so re-running it is a no-op.
+
+## Production runtime
+
+Build the image from the monorepo root, which the build needs for the root lockfile:
+
+```bash
+docker build -f apps/backend/Dockerfile -t geko-backend .
+```
+
+On start the container applies pending migrations and then boots the API on `PORT`
+(default `4000`). A failed migration exits non-zero before the API starts. Set
+`RUN_MIGRATIONS=false` when migrations run in a separate pre-deploy step instead.
+
+On the host, point the service at `apps/backend/Dockerfile` with the repository root as
+the build context. Set the variables from [Production configuration](#production-configuration),
+`TRUST_PROXY=1` behind the platform's proxy, and `/health` as the health check path. It
+returns 200 only once Postgres is reachable.
+
 ## Scripts
 
-| Script       | Description                          |
-| ------------ | ------------------------------------ |
-| `dev`        | Start NestJS with file watch         |
-| `build`      | Compile to `dist/`                   |
-| `typecheck`  | TypeScript check without emit        |
-| `lint`       | Run ESLint                           |
-| `test`       | Run Jest                             |
+| Script         | Description                              |
+| -------------- | ---------------------------------------- |
+| `dev`          | Start NestJS with file watch             |
+| `build`        | Compile to `dist/`                       |
+| `start:prod`   | Run the compiled API from `dist/`        |
+| `migrate:prod` | Apply pending migrations from `dist/`    |
+| `typecheck`    | TypeScript check without emit            |
+| `lint`         | Run ESLint                               |
+| `test`         | Run Jest                                 |

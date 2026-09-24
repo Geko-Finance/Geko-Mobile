@@ -32,6 +32,14 @@ describe("fetchCctpAttestation", () => {
     );
   });
 
+  it("treats a 404 as pending - Circle answers 'Message not found' until it has indexed the burn", async () => {
+    mockFetchOnce(404, { error: "Message not found for provided parameters" });
+
+    await expect(fetchCctpAttestation(0, "hash-1")).rejects.toBeInstanceOf(
+      CctpAttestationPendingError
+    );
+  });
+
   it("throws CctpAttestationFailedError when Circle reports the message failed", async () => {
     mockFetchOnce(200, { messages: [{ status: "failed" }] });
 

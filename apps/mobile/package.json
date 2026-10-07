@@ -3,8 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "dev": "expo start --ios",
-    "start": "expo start",
+    "dev": "node init && expo start --ios",
+    "start": "node init && expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -15,8 +15,8 @@
     "test": "jest --runInBand",
     "doctor": "npx expo-doctor",
     "expo-go": "npx expo start --go --lan --clear",
-    "dev-ios-simulator-build": "npx eas-cli build --profile ios-simulator --platform ios",
-    "dev-android-simulator-build": "npx eas-cli build --profile development --platform android"
+    "dev-ios-simulator-build": "node init && npx eas-cli build --profile ios-simulator --platform ios",
+    "dev-android-simulator-build": "node init && npx eas-cli build --profile development --platform android"
   },
   "dependencies": {
     "@expo/html-elements": "^0.12.5",

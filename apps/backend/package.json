@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "description": "Geko wallet backend API",
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
-    "start:prod": "node dist/main.js",
+    "dev": "node init && nest start --watch",
+    "build": "node init && nest build",
+    "start:prod": "node init && node dist/main.js",
     "migrate:prod": "node dist/db/migrate.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint",
